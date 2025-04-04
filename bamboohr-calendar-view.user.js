@@ -13,828 +13,482 @@
 (function () {
     'use strict';
 
-    // Variable to avoid duplications
+    // Éviter l'exécution multiple du script sur la même page
     let calendarInitialized = false;
-    const DEBUG = true;
+    const DEBUG = true; // passer à true pour activer les logs de débogage
 
-    // Add our CSS
+    // Style CSS personnalisé pour le calendrier et ses éléments
     const customCSS = document.createElement('style');
     customCSS.textContent = `
-        .custom-calendar-container {
-            background-color: rgb(255, 255, 255);
-            border-radius: 16px;
-            box-shadow: rgba(56, 49, 47, 0.05) 2px 2px 0px 2px;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            gap: 28px;
-            height: auto;
-            min-height: auto;
-            padding: 32px;
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
-        .calendar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .calendar-header h2 {
-            font-size: 22px;
-            font-weight: 600;
-            font-family: Fields, serif;
-        }
-        .leave-type-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-        .legend-item {
-            display: flex;
-            align-items: center;
-        }
-        .color-box {
-            width: 15px;
-            height: 15px;
-            border-radius: 3px;
-            margin-right: 5px;
-        }
-        .month-nav {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        .month-nav button {
-            background: #f0f0f0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            padding: 5px 10px;
-            margin: 0 5px;
-            cursor: pointer;
-        }
-        .month-nav button:hover {
-            background: #e0e0e0;
-        }
-        .month-nav h3 {
-            margin: 0 10px;
-        }
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 1px;
-            background-color: #f0f0f0;
-            border: 1px solid #ddd;
-        }
-        .calendar-cell {
-            background-color: white;
-            min-height: 80px;
-            padding: 5px;
-            position: relative;
-        }
-        .calendar-cell.header {
-            background-color: #f8f8f8;
-            font-weight: bold;
-            text-align: center;
-            padding: 10px;
-            min-height: auto;
-        }
-        .calendar-cell.weekend {
-            background-color: #f5f5f5;
-        }
-        .calendar-cell.today {
-            background-color: #faffd1;
-        }
-        .calendar-cell.outside-month {
-            color: #ccc;
-            background-color: #f9f9f9;
-        }
-        .calendar-cell.outside-month.weekend {
-            background-color: #f0f0f0;
-        }
-        .day-number {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .calendar-event {
-            font-size: 11px;
-            padding: 2px 4px;
-            border-radius: 3px;
-            margin-bottom: 2px;
-            color: white;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .year-view {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-        .mini-month {
-            border: 1px solid #ddd;
-            padding: 10px;
-            border-radius: 4px;
-        }
-        .mini-month h4 {
-            text-align: center;
-            margin: 0 0 10px 0;
-        }
-        .mini-calendar {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 1px;
-            font-size: 12px;
-        }
-        .mini-cell {
-            text-align: center;
-            padding: 2px;
-            position: relative;
-            height: 20px;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .mini-cell.header {
-            font-weight: bold;
-        }
-        .mini-cell.weekend {
-            background-color: #f0f0f0;
-        }
-        .mini-cell.today {
-            background-color: #faffd1;
-        }
-        .event-rtt {
-            background-color: #4CAF50 !important;
-            color: white !important;
-        }
-        .event-conges {
-            background-color: #2196F3 !important;
-            color: white !important;
-        }
-        .event-ferie {
-            background-color: #9C27B0 !important;
-            color: white !important;
-        }
-        .event-anciennete {
-            background-color: #FF9800 !important;
-            color: white !important;
-        }
-        .view-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        .view-button {
-            padding: 8px 15px;
-            background-color: #f0f0f0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .view-button.active {
-            background-color: #007bff;
-            color: white;
-            border-color: #007bff;
-        }
-        .year-control {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .year-control button {
-            background: #f0f0f0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            padding: 5px 15px;
-            margin: 0 10px;
-            cursor: pointer;
-        }
-        .year-control h2 {
-            margin: 0;
-        }
-        
-        /* Upcoming Time Off styling */
-        .holiday-item {
-            background-color: rgba(156, 39, 176, 0.2) !important;
-            border-radius: 4px !important;
-            padding: 2px 4px !important;
-        }
-        
-        .rtt-item {
-            background-color: rgba(76, 175, 80, 0.2) !important;
-            border-radius: 4px !important;
-            padding: 2px 4px !important;
-        }
-        
-        .leave-item {
-            background-color: rgba(33, 150, 243, 0.2) !important;
-            border-radius: 4px !important;
-            padding: 2px 4px !important;
-        }
-        
-        .seniority-item {
-            background-color: rgba(255, 152, 0, 0.2) !important;
-            border-radius: 4px !important;
-            padding: 2px 4px !important;
-        }
+        /* ===== Conteneur principal ===== */
+.custom-calendar-container {
+  background-color: #ffffff !important;
+  border-radius: 16px !important;
+  box-shadow: rgba(56, 49, 47, 0.05) 2px 2px 0px 2px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 28px !important;
+  padding: 32px !important;
+  margin: 20px 0 !important;
+}
+
+/* ===== En-tête du calendrier ===== */
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.calendar-header h2 {
+  font-size: 22px;
+  font-weight: 600;
+  font-family: Arial, sans-serif;
+  margin: 0;
+}
+.view-buttons button {
+  margin-left: 10px;
+  padding: 5px 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ===== Légende ===== */
+.leave-type-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+.legend-item .color-box {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  margin-right: 5px;
+}
+
+/* ===== Navigation mois/année ===== */
+.month-nav,
+.year-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+.month-nav button,
+.year-control button {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin: 0 5px;
+  cursor: pointer;
+}
+.month-nav button:hover,
+.year-control button:hover {
+  background: #e0e0e0;
+}
+.month-nav h3,
+.year-control h2 {
+  margin: 0 10px;
+}
+
+/* ===== Grille calendrier mensuel ===== */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background-color: #e0e0e0;
+}
+.calendar-cell {
+  background-color: #fff;
+  min-height: 80px;
+  padding: 4px;
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.calendar-cell.header,
+.mini-cell.header {
+  background-color: #f8f8f8;
+  font-weight: bold;
+  text-align: center;
+}
+.calendar-cell.outside-month {
+  background-color: #fafafa;
+  color: #aaa;
+}
+.calendar-cell.weekend,
+.mini-cell.weekend {
+  background-color: #fafafa;
+}
+.calendar-cell.today,
+.mini-cell.today {
+  outline: 1px solid #2196f3;
+}
+
+/* ===== Événements (vue mensuelle) ===== */
+.calendar-event {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #fff;
+  padding: 2px 4px;
+  border-radius: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* ===== Grille annuelle ===== */
+.year-view {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.mini-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background-color: #e0e0e0;
+}
+.mini-cell {
+  background-color: #fff;
+  text-align: center;
+  position: relative;
+  height: 12px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+.mini-cell.header {
+  font-weight: bold;
+}
+.mini-cell.weekend {
+  background-color: #f0f0f0;
+}
+.mini-cell.today {
+  background-color: #faffd1;
+}
+
+/* ===== Types de congés (vue annuelle) ===== */
+.mini-cell.event-rtt {
+  background-color: #4caf50 !important;
+  color: white !important;
+}
+.mini-cell.event-leave {
+  background-color: #2196f3 !important;
+  color: white !important;
+}
+.mini-cell.event-holiday {
+  background-color: #9c27b0 !important;
+  color: white !important;
+}
+.mini-cell.event-seniority {
+  background-color: #ff9800 !important;
+  color: white !important;
+}
+.mini-cell.event-other {
+  background-color: #607d8b !important;
+  color: white !important;
+}
+
     `;
     document.head.appendChild(customCSS);
 
-    // Global variables
-    let currentMonth = new Date().getMonth();
-    let currentYear = new Date().getFullYear();
-    let currentView = 'year'; // 'year' or 'month' (annual view by default)
-    let timeOffEvents = [];
-
-    // Main function to add the calendar
-    function addCalendarView() {
-        // Avoid duplication
-        if (calendarInitialized) {
-            console.log('Calendar already initialized, skipping');
-            return;
-        }
-
-        // Check if URL matches the leave page
-        if (!window.location.href.includes('/employees/pto')) {
-            return;
-        }
-
-        console.log('BambooHR Calendar Enhancement: Starting...');
-
-        // Wait for the page to be fully loaded
-        setTimeout(function () {
-            // Check again to avoid duplicates after the delay
-            if (document.querySelector('.custom-calendar-container')) {
-                console.log('Calendar already exists, skipping');
-                return;
-            }
-
-            // Extract leave data from the page
-            timeOffEvents = extractTimeOffData();
-
-            console.log('Extracted time off data:', timeOffEvents);
-
-            // Create the container for our calendar
-            const calendarContainer = document.createElement('div');
-            calendarContainer.className = 'custom-calendar-container';
-            calendarContainer.id = 'custom-bamboohr-calendar';
-            calendarContainer.innerHTML = `
-                <div class="calendar-header">
-                    <h2>📅 Annual Leave Calendar</h2>
-                </div>
-                <div class="leave-type-legend">
-                    <div class="legend-item">
-                        <div class="color-box" style="background-color: #4CAF50;"></div>
-                        <span>RTT (AB-310)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="color-box" style="background-color: #2196F3;"></div>
-                        <span>Paid Leave (AB-300)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="color-box" style="background-color: #9C27B0;"></div>
-                        <span>Public Holidays</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="color-box" style="background-color: #FF9800;"></div>
-                        <span>Seniority (AB-631)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="color-box" style="background-color: #f0f0f0;"></div>
-                        <span>Weekends</span>
-                    </div>
-                </div>
-                <div class="view-buttons">
-                    <div class="view-button" data-view="month">Monthly View</div>
-                    <div class="view-button active" data-view="year">Annual View</div>
-                </div>
-                <div id="calendar-container"></div>
-            `;
-
-            // Find the appropriate element before which to insert our calendar
-            const targetElement = document.querySelector('.fabric-polnhg-root') ||
-                document.querySelector('section.fabric-polnhg-root');
-
-            if (targetElement && targetElement.parentNode) {
-                // Insert the calendar before the "Upcoming Time Off" section
-                targetElement.parentNode.insertBefore(calendarContainer, targetElement);
-
-                // Render the calendar
-                renderCalendar();
-
-                // Add event listeners
-                addEventListeners();
-
-                // Mark as initialized
-                calendarInitialized = true;
-
-                console.log('BambooHR Calendar Enhancement: Calendar added successfully');
-            } else {
-                console.error('BambooHR Calendar Enhancement: Target element not found');
-            }
-        }, 2000); // Wait 2 seconds to ensure the page is loaded
+    // Exécuter le script uniquement sur les pages de congés (PTO)
+    if (!window.location.href.includes('/employees/pto')) {
+        return;
     }
 
-    // Function to add event listeners
-    function addEventListeners() {
-        // View buttons
-        const viewButtons = document.querySelectorAll('.view-button');
-        viewButtons.forEach(button => {
-            button.addEventListener('click', function () {
-                viewButtons.forEach(btn => btn.classList.remove('active'));
-                this.classList.add('active');
-                currentView = this.getAttribute('data-view');
-                renderCalendar();
-            });
-        });
-    }
+    // Surveiller les changements de la page pour insérer le calendrier au bon moment
+    const observer = new MutationObserver(() => {
+        if (calendarInitialized) return;
 
-    // Fonction améliorée pour extraire les données de congés de manière générique
-    // Fonction améliorée pour extraire les données de congés - compatible multilingue
-    function extractTimeOffData() {
-        const timeOffEvents = [];
-        const processedItems = new Set(); // Pour éviter les doublons
+        const span = Array.from(document.querySelectorAll('span')).find(el =>
+            /Congés à venir|Upcoming Time Off|Anstehende Abwesenheit/i.test(el.textContent.trim())
+        );
 
-        // Map pour stocker les couleurs par type de congé
-        const typeColorMap = new Map();
-
-        // Couleurs prédéfinies attrayantes
-        const predefinedColors = [
-            '#4CAF50', // Vert
-            '#2196F3', // Bleu
-            '#9C27B0', // Violet
-            '#FF9800', // Orange
-            '#E91E63', // Rose
-            '#00BCD4', // Cyan
-            '#3F51B5', // Indigo
-            '#009688', // Teal
-            '#FFC107', // Ambre
-            '#8BC34A', // Vert clair
-            '#673AB7', // Violet foncé
-            '#CDDC39'  // Vert-jaune
-        ];
-
-        try {
-            console.log("Recherche d'éléments de congés...");
-
-            // Approche encore plus générique pour trouver des éléments de congés
-            // On cherche toutes les sections qui pourraient contenir des congés
-            const allSections = document.querySelectorAll('section, .MuiBox-root, .fabric-5qovnk-root');
-
-            // Rechercher d'abord la section principale
-            let mainSection = null;
-
-            for (const section of allSections) {
-                // Rechercher du texte qui pourrait indiquer une section de congés
-                const sectionText = section.textContent || '';
-                if (sectionText.includes('Congés à venir') ||
-                    sectionText.includes('Upcoming Time Off') ||
-                    sectionText.includes('Congé') ||
-                    sectionText.includes('Leave') ||
-                    sectionText.includes('Holiday')) {
-                    mainSection = section;
-                    console.log('Section principale de congés trouvée:', sectionText.substring(0, 30));
-                    break;
-                }
+        if (span) {
+            calendarInitialized = true;
+            observer.disconnect(); // On arrête d’observer, c’est bon
+            try {
+                console.log("loaded");
+                initializeCalendar();
+            } catch (err) {
+                console.error("Erreur lors de l'initialisation du calendrier:", err);
             }
-
-            if (!mainSection) {
-                console.log('Aucune section de congés trouvée, utilisation de la page entière');
-                mainSection = document.body;
-            }
-
-            // Chercher les éléments potentiels de congés dans la section ou sur la page
-            // Approche 1: Rechercher des éléments qui ressemblent à des entrées de congés
-            const leaveItems = [];
-
-            // Structure typique des lignes de congés
-            const candidateRows = mainSection.querySelectorAll('.MuiBox-root.css-1lekzkb, .fabric-5qovnk-root.MuiBox-root');
-
-            candidateRows.forEach(row => {
-                // Vérifier si la ligne contient une date et une description
-                const hasDate = row.querySelector('.fabric-10enqx8-root p, .MuiTypography-root, p') !== null;
-
-                // Vérifier s'il contient du texte qui ressemble à un congé
-                const rowText = row.textContent || '';
-                const isLeaveRow = rowText.includes('jour') ||
-                    rowText.includes('day') ||
-                    rowText.includes('RTT') ||
-                    rowText.includes('congé') ||
-                    rowText.includes('leave') ||
-                    rowText.includes('holiday') ||
-                    rowText.includes('vacation') ||
-                    rowText.includes('AB-');
-
-                if (hasDate && isLeaveRow) {
-                    leaveItems.push(row);
-                }
-            });
-
-            console.log(`Trouvé ${leaveItems.length} éléments potentiels de congés`);
-
-            // Parcourir les éléments
-            leaveItems.forEach((item, index) => {
-                try {
-                    // Générer un identifiant unique basé sur le contenu de l'élément
-                    const itemText = item.textContent || '';
-                    const itemId = `item_${index}_${itemText.length}`;
-
-                    if (processedItems.has(itemId)) {
-                        return; // Éviter les doublons
-                    }
-                    processedItems.add(itemId);
-
-                    // Rechercher l'élément de date (premier élément contenant du texte qui ressemble à une date)
-                    let dateText = '';
-                    let dateElement = null;
-
-                    // Chercher tous les éléments qui pourraient contenir une date
-                    const allElements = item.querySelectorAll('*');
-                    for (const el of allElements) {
-                        const text = el.textContent || '';
-                        // Détecter si le texte ressemble à une date (contient un chiffre et un mois)
-                        if (/\d+\s*[a-zéûùàâê.]/i.test(text) && text.length < 30) {
-                            dateText = text.trim();
-                            dateElement = el;
-                            break;
-                        }
-                    }
-
-                    if (!dateText) {
-                        console.log(`Pas de date trouvée pour l'élément ${index}`);
-                        return;
-                    }
-
-                    console.log(`Date trouvée: "${dateText}"`);
-
-                    // Trouver le type de congé en cherchant dans les éléments qui ne sont pas la date
-                    let typeText = '';
-
-                    // Chercher des éléments avec classes spécifiques
-                    const typeElements = item.querySelectorAll('.fabric-kv8rfh-root, .fabric-163vq54-root, p');
-
-                    for (const el of typeElements) {
-                        // Ignorer l'élément de date
-                        if (el === dateElement || el.contains(dateElement) || dateElement?.contains(el)) {
-                            continue;
-                        }
-
-                        const text = el.textContent || '';
-                        if (text &&
-                            (text.includes('jour') || text.includes('day') ||
-                                text.includes('RTT') || text.includes('AB-') ||
-                                text.includes('heures') || text.includes('hours'))) {
-                            typeText = text.trim();
-                            break;
-                        }
-                    }
-
-                    // Si aucun type spécifique n'est trouvé, prendre tout texte non-date
-                    if (!typeText) {
-                        for (const el of allElements) {
-                            // Ignorer l'élément de date
-                            if (el === dateElement || el.contains(dateElement) || dateElement?.contains(el)) {
-                                continue;
-                            }
-
-                            const text = el.textContent || '';
-                            if (text && text !== dateText && text.length > 3) {
-                                typeText = text.trim();
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!typeText) {
-                        console.log(`Pas de type trouvé pour la date: ${dateText}`);
-                        // Utiliser un type par défaut si rien n'est trouvé
-                        typeText = "Congé";
-                    }
-
-                    console.log(`Type trouvé: "${typeText}"`);
-
-                    // Vérifier si approuvé
-                    const isApproved =
-                        item.textContent.includes('Approved') ||
-                        item.textContent.includes('Approuvé') ||
-                        item.querySelector('svg[viewBox="0 0 512 512"]') !== null;
-
-                    // Analyser la date - approche universelle
-                    const dateInfo = parseDateUniversal(dateText);
-
-                    if (!dateInfo.startDate || !dateInfo.endDate) {
-                        console.log(`Impossible d'analyser les dates: ${dateText}`);
-                        return;
-                    }
-
-                    // Déterminer la catégorie de congé de manière plus robuste
-                    let typeCategory = 'other';
-
-                    // Extraire les codes AB si présents
-                    const abMatch = typeText.match(/AB-(\d+)/i);
-                    if (abMatch) {
-                        typeCategory = `AB-${abMatch[1]}`;
-                    }
-                    // Sinon, utiliser d'autres indices textuels
-                    else if (/RTT/i.test(typeText)) {
-                        typeCategory = 'RTT';
-                    } else if (/holiday|férié|ferie|public|easter|monday|labour|ascension|victoire/i.test(typeText)) {
-                        typeCategory = 'holiday';
-                    } else if (/congé|leave|vacation|france 20\d{2}|AB-300/i.test(typeText)) {
-                        typeCategory = 'leave';
-                    } else if (/ancienneté|seniority|AB-631/i.test(typeText)) {
-                        typeCategory = 'seniority';
-                    }
-
-                    // Attribution cohérente des couleurs
-                    let eventColor;
-
-                    if (typeColorMap.has(typeCategory)) {
-                        eventColor = typeColorMap.get(typeCategory);
-                    } else {
-                        const colorIndex = typeColorMap.size % predefinedColors.length;
-                        eventColor = predefinedColors[colorIndex];
-                        typeColorMap.set(typeCategory, eventColor);
-                    }
-
-                    // Ajouter l'événement au calendrier
-                    timeOffEvents.push({
-                        title: typeText,
-                        start: dateInfo.startDate,
-                        end: dateInfo.endDate,
-                        color: eventColor,
-                        type: typeCategory,
-                        status: isApproved ? 'Approved' : 'Pending'
-                    });
-
-                    console.log('Événement ajouté:', {
-                        date: dateText,
-                        type: typeText,
-                        category: typeCategory,
-                        color: eventColor,
-                        start: dateInfo.startDate.toLocaleDateString(),
-                        end: dateInfo.endDate.toLocaleDateString()
-                    });
-
-                } catch (itemError) {
-                    console.error(`Erreur de traitement de l'élément ${index}:`, itemError);
-                }
-            });
-
-            // Éliminer les doublons potentiels
-            const dedupedEvents = [];
-            const eventKeys = new Set();
-
-            timeOffEvents.forEach(event => {
-                const key = `${event.start.toDateString()}_${event.end.toDateString()}_${event.type}`;
-                if (!eventKeys.has(key)) {
-                    eventKeys.add(key);
-                    dedupedEvents.push(event);
-                }
-            });
-
-            console.log(`Événements finaux après déduplication: ${dedupedEvents.length}`);
-
-            // Afficher le mappage des types aux couleurs
-            console.log("Mappage des types de congés aux couleurs:");
-            typeColorMap.forEach((color, type) => {
-                console.log(`${type}: ${color}`);
-            });
-
-            return dedupedEvents;
-        } catch (error) {
-            console.error('Erreur globale d\'extraction:', error);
-            return [];
         }
-    }
+    });
 
-    // Fonction très robuste d'analyse des dates dans différentes langues et formats
-    // Fonction très robuste d'analyse des dates dans différentes langues et formats
-    function parseDateUniversal(dateText) {
-        try {
-            console.log(`Analyse de la date: "${dateText}"`);
+    observer.observe(document.body, { childList: true, subtree: true });
 
-            // Normaliser les séparateurs de plage
-            const normalizedText = dateText.replace(/–/g, '-');
-
-            // Détecter si c'est une plage de dates
-            const isRange = normalizedText.includes('-');
-
-            if (isRange) {
-                // Séparer la plage
-                const parts = normalizedText.split('-').map(p => p.trim());
-
-                // Extraction des valeurs numériques (jours)
-                const dayRegex = /(\d+)/g;
-
-                // Extraction des chaînes de mois potentielles
-                const monthRegex = /[a-zéèêùûôâ]{3,}/gi;
-
-                // Pour la partie de début
-                const startDayMatches = parts[0].match(dayRegex);
-                const startDay = startDayMatches ? parseInt(startDayMatches[0]) : null;
-
-                const startMonthMatches = parts[0].match(monthRegex);
-                const startMonthStr = startMonthMatches ? startMonthMatches[0].trim().toLowerCase() : null;
-
-                // Pour la partie de fin
-                const endDayMatches = parts[1].match(dayRegex);
-                const endDay = endDayMatches ? parseInt(endDayMatches[0]) : null;
-
-                let endMonthStr = null;
-                const endMonthMatches = parts[1].match(monthRegex);
-
-                if (endMonthMatches) {
-                    // La partie de fin contient un mois
-                    endMonthStr = endMonthMatches[0].trim().toLowerCase();
-                } else {
-                    // Même mois que la partie de début
-                    endMonthStr = startMonthStr;
-                }
-
-                // Convertir les chaînes de mois en numéros de mois
-                const startMonth = getMonthNumberRobust(startMonthStr);
-                const endMonth = getMonthNumberRobust(endMonthStr);
-
-                console.log(`Plage de dates analysée: du ${startDay} ${startMonthStr} (mois ${startMonth}) au ${endDay} ${endMonthStr} (mois ${endMonth})`);
-
-                // Année en cours
-                const currentYear = new Date().getFullYear();
-
-                if (startDay !== null && startMonth !== -1 && endDay !== null && endMonth !== -1) {
-                    const startDate = new Date(currentYear, startMonth, startDay);
-                    const endDate = new Date(currentYear, endMonth, endDay);
-
-                    console.log(`Dates créées: du ${startDate.toLocaleDateString()} au ${endDate.toLocaleDateString()}`);
-
-                    return {
-                        startDate: startDate,
-                        endDate: endDate
-                    };
-                }
-            } else {
-                // Date unique
-                const dayMatch = normalizedText.match(/(\d+)/);
-                const monthMatch = normalizedText.match(/[a-zéèêùûôâ]{3,}/i);
-
-                if (dayMatch && monthMatch) {
-                    const day = parseInt(dayMatch[0]);
-                    const monthStr = monthMatch[0].trim().toLowerCase();
-                    const month = getMonthNumberRobust(monthStr);
-
-                    console.log(`Date unique analysée: ${day} ${monthStr} (mois ${month})`);
-
-                    if (month !== -1) {
-                        const currentYear = new Date().getFullYear();
-                        const date = new Date(currentYear, month, day);
-
-                        console.log(`Date créée: ${date.toLocaleDateString()}`);
-
-                        return {
-                            startDate: date,
-                            endDate: date
-                        };
-                    }
-                }
-            }
-
-            // Échec de l'analyse, essayer une approche alternative
-            console.log(`Tentative d'analyse alternative pour: "${dateText}"`);
-
-            // Pour les cas comme "7 juil. - 25" où le jour de fin n'a pas de mois explicite
-            if (isRange) {
-                const parts = normalizedText.split('-').map(p => p.trim());
-
-                // Si la partie de fin est juste un nombre
-                if (/^\d+$/.test(parts[1])) {
-                    // Extraire le jour et le mois du début
-                    const startMatch = parts[0].match(/(\d+)\s+([a-zéèêùûôâ.]+)/i);
-                    if (startMatch) {
-                        const startDay = parseInt(startMatch[1]);
-                        const startMonthStr = startMatch[2].trim().toLowerCase();
-                        const startMonth = getMonthNumberRobust(startMonthStr);
-
-                        // Extraire le jour de fin
-                        const endDay = parseInt(parts[1]);
-
-                        if (startMonth !== -1 && !isNaN(endDay)) {
-                            const currentYear = new Date().getFullYear();
-                            const startDate = new Date(currentYear, startMonth, startDay);
-                            const endDate = new Date(currentYear, startMonth, endDay);
-
-                            console.log(`Dates créées (analyse alternative): du ${startDate.toLocaleDateString()} au ${endDate.toLocaleDateString()}`);
-
-                            return {
-                                startDate: startDate,
-                                endDate: endDate
-                            };
-                        }
-                    }
-                }
-            }
-
-            // Échec de l'analyse, retourner des valeurs par défaut
-            console.log(`Échec de l'analyse pour: "${dateText}", utilisation de dates par défaut`);
-            // En cas d'échec, utiliser la date actuelle comme valeur par défaut
-            const today = new Date();
-            return {
-                startDate: today,
-                endDate: today
-            };
-
-        } catch (error) {
-            console.error('Erreur d\'analyse de date:', error);
-            // En cas d'erreur, utiliser la date actuelle comme valeur par défaut
-            const today = new Date();
-            return {
-                startDate: today,
-                endDate: today
-            };
-        }
-    }
-
-    // Fonction très robuste de reconnaissance des mois dans différentes langues
-    function getMonthNumberRobust(monthStr) {
-        if (!monthStr) return -1;
-
-        // Normaliser la chaîne
-        const normalized = monthStr.toLowerCase()
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Enlever les accents
-            .replace(/[.,]/g, ''); // Enlever la ponctuation
-
-        // Mappages de mois très complets (y compris les abréviations courantes)
-        const monthMappings = {
-            // Français
-            'janvier': 0, 'jan': 0, 'janv': 0, 'ja': 0,
-            'fevrier': 1, 'fev': 1, 'fe': 1, 'fév': 1, 'févr': 1,
-            'mars': 2, 'mar': 2, 'ma': 2,
-            'avril': 3, 'avr': 3, 'av': 3,
-            'mai': 4,
-            'juin': 5, 'jui': 5, 'jun': 5,
-            'juillet': 6, 'juil': 6, 'jul': 6,
-            'aout': 7, 'août': 7, 'aou': 7, 'au': 7, 'aug': 7,
-            'septembre': 8, 'sept': 8, 'sep': 8, 'se': 8,
-            'octobre': 9, 'oct': 9, 'oc': 9,
-            'novembre': 10, 'nov': 10, 'no': 10,
-            'decembre': 11, 'dec': 11, 'de': 11, 'déc': 11,
-
-            // Anglais
-            'january': 0, 'jan': 0,
-            'february': 1, 'feb': 1,
-            'march': 2, 'mar': 2,
-            'april': 3, 'apr': 3,
-            'may': 4,
-            'june': 5, 'jun': 5,
-            'july': 6, 'jul': 6,
-            'august': 7, 'aug': 7,
-            'september': 8, 'sep': 8, 'sept': 8,
-            'october': 9, 'oct': 9,
-            'november': 10, 'nov': 10,
-            'december': 11, 'dec': 11
+    /**
+     * Initialise le calendrier en insérant le conteneur et en peuplant les données
+     */
+    function initializeCalendar() {
+        // Déterminer la langue de la page en se basant sur le texte de l'onglet ou du contenu
+        const pageText = document.body.textContent || "";
+        const isFrench = pageText.includes("Congé") || pageText.includes("congé") || pageText.includes("Congés");
+        const TEXT = {
+            title: isFrench ? "📅 Calendrier Annuel des Congés" : "📅 Annual Leave Calendar",
+            viewMonth: isFrench ? "Vue Mensuelle" : "Month View",
+            viewYear: isFrench ? "Vue Annuelle" : "Year View",
+            legendHolidays: isFrench ? "Jours fériés" : "Public Holidays",
+            legendLeave: isFrench ? "Congés payés" : "Paid Leave",
+            legendRTT: "RTT",  // "RTT" is understood in both languages in context
+            legendSeniority: isFrench ? "Ancienneté" : "Seniority",
+            legendWeekends: isFrench ? "Week-ends" : "Weekends",
+            legendOther: isFrench ? "Autres" : "Other",
+            errorNoData: isFrench ? "Aucune donnée de congé à afficher." : "No time off data available to display."
         };
 
-        // Recherche directe
-        if (monthMappings[normalized] !== undefined) {
-            return monthMappings[normalized];
-        }
-
-        // Recherche par correspondance partielle
-        for (const [key, value] of Object.entries(monthMappings)) {
-            // Vérifier si la chaîne normalisée est au début de la clé ou vice versa
-            if (key.startsWith(normalized) || normalized.startsWith(key)) {
-                return value;
-            }
-        }
-
-        // Recherche par les 3 premières lettres
-        if (normalized.length >= 3) {
-            const firstThree = normalized.substring(0, 3);
-            for (const [key, value] of Object.entries(monthMappings)) {
-                if (key.startsWith(firstThree)) {
-                    return value;
+        // Insérer la structure du calendrier dans la page
+        const container = document.createElement('div');
+        container.className = 'custom-calendar-container';
+        container.id = 'calendar-container';
+        container.innerHTML = `
+            <div class="calendar-header">
+                <h2>${TEXT.title}</h2>
+                <div class="view-buttons">
+                    <button id="toggle-view">${TEXT.viewMonth}</button>
+                </div>
+            </div>
+            <!-- Légende des types de congés -->
+            <div class="leave-type-legend" id="legend-container"></div>
+            <!-- Zone d'affichage du calendrier (mois ou année) -->
+            <div id="calendar-display"></div>
+        `;
+        // Insérer le calendrier juste après le conteneur PTO principal
+        const main = document.querySelector('main#micro-container5');
+        if (main) {
+            const innerContainer = main.querySelector('div');
+            if (innerContainer) {
+                const innerDivs = Array.from(innerContainer.children).filter(el => el.tagName === 'DIV');
+                if (innerDivs.length >= 3) {
+                    // Insérer juste avant le 3ᵉ div (index 2)
+                    innerContainer.insertBefore(container, innerDivs[2]);
+                    console.log("✅ Calendrier inséré entre le 2ᵉ et le 3ᵉ div");
+                } else {
+                    // Fallback si on ne trouve pas 3 divs
+                    innerContainer.appendChild(container);
+                    console.warn("⚠️ Moins de 3 divs dans le conteneur interne, insertion à la fin");
                 }
+            } else {
+                console.warn("❌ Aucun <div> interne trouvé dans #micro-container5");
+            }
+        } else {
+            console.warn("❌ Impossible de trouver <main id='micro-container5'>");
+        }
+
+
+
+        // Charger les données de congés
+        const events = extractTimeOffData();
+        if (DEBUG) console.log("Données de congés extraites:", events);
+        // Afficher un message d'erreur si aucune donnée n'a pu être extraite
+        if (!events || events.length === 0) {
+            const errorMsg = document.createElement('p');
+            errorMsg.style.color = 'red';
+            errorMsg.textContent = TEXT.errorNoData;
+            container.querySelector('#calendar-display').appendChild(errorMsg);
+            return;
+        }
+
+        // Construire la légende des types de congés de manière dynamique
+        buildLegend(events);
+
+        // Initialiser la vue (par défaut en vue annuelle)
+        currentView = 'year';
+        const toggleViewBtn = container.querySelector('#toggle-view');
+        toggleViewBtn.addEventListener('click', () => {
+            // Alterner entre vue annuelle et mensuelle
+            if (currentView === 'year') {
+                currentView = 'month';
+                toggleViewBtn.textContent = TEXT.viewYear;
+            } else {
+                currentView = 'year';
+                toggleViewBtn.textContent = TEXT.viewMonth;
+            }
+            renderCalendar();
+        });
+
+        // Rendre le calendrier initial (vue annuelle par défaut)
+        renderCalendar();
+    }
+
+    // Variables globales pour la navigation du calendrier
+    let currentYear = new Date().getFullYear();
+    let currentMonth = new Date().getMonth();
+    let currentView = 'year';  // 'year' ou 'month'
+
+    /**
+     * Extrait les données de congés visibles sur la page.
+     * Retourne un tableau d'objets { title, start, end, color, type, status }.
+     */
+    function extractTimeOffData() {
+        const events = [];
+
+        const span = Array.from(document.querySelectorAll('span')).find(el =>
+            /Congés à venir|Upcoming Time Off|Anstehende Abwesenheit/i.test(el.textContent.trim())
+        );
+
+        console.log("span", span);
+
+        if (!span) {
+            console.warn('❌ Aucun texte "Congés à venir" ou "Upcoming Time Off" trouvé.');
+            return [];
+        }
+
+        const container = span.closest('section, div, article');
+        if (!container) {
+            console.warn('❌ Aucune section parente trouvée pour le span.');
+            return [];
+        }
+
+        const paragraphs = Array.from(container.querySelectorAll('p'));
+        const dateRegex = /\b(\d{1,2})\s*(janv\.?|févr\.?|mars|avr\.?|mai|juin|juil\.?|août|sept\.?|oct\.?|nov\.?|déc\.?|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s*\d{1,2}/i;
+
+
+        console.log("paragraphs", paragraphs);
+
+        
+        for (let i = 0; i < paragraphs.length; i++) {
+            const line = paragraphs[i].textContent.trim();
+            console.log("line", line);
+
+            const dateInfo = parseDateUniversal(line);
+            
+            if (dateInfo.startDate && !isNaN(dateInfo.startDate.getTime())) {
+                const dateText = line;
+                let description = '';
+                let status = '';
+
+                if (i<paragraphs.length-1) {
+                    description = paragraphs[i + 1].textContent.trim();
+                }
+
+                const typeCategory = detectTypeFromText(description);
+                const color = getColorForType(typeCategory);
+
+                events.push({
+                    title: description || 'Congé',
+                    start: dateInfo.startDate,
+                    end: dateInfo.endDate,
+                    type: typeCategory,
+                    color,
+                    status: status || 'Pending'
+                });
+
+                if (DEBUG) {
+                    console.log('🗓️ Événement détecté :', {
+                        dateText,
+                        description,
+                        status,
+                        dateInfo
+                    });
+                }
+
+                //i = j; // avancer jusqu’à la prochaine date
+            } else {
+                //i++; // pas une date → ligne isolée
             }
         }
 
-        // Cas spéciaux
-        if (normalized === 'm' || normalized === 'ma') {
-            // Ambigu entre mars et mai - supposer mai
-            return 4;
-        }
+        console.log("events", events);
 
-        console.log(`Mois non reconnu: "${monthStr}" (normalisé: "${normalized}")`);
-        return -1;
+        return events;
+    }
+
+    function detectTypeFromText(text) {
+        const lowered = text.toLowerCase();
+
+        if (/rtt|ab-310/.test(lowered)) return 'RTT';
+        if (/anciennet|ab-631/.test(lowered)) return 'seniority';
+        if (/holiday|férié|ferie|jour férié|easter|ascension|may day|labour day|victoire|ostern|auffahrt|mai feiertag/i.test(lowered)) return 'holiday';
+        if (/ab-300|paid leave|congés|conge|urlaub/i.test(lowered)) return 'leave';
+
+
+        return 'other';
+    }
+
+    function getColorForType(type) {
+        const colors = {
+            'RTT': '#4CAF50',
+            'leave': '#2196F3',
+            'holiday': '#9C27B0',
+            'seniority': '#FF9800',
+            'other': '#607D8B'
+        };
+        return colors[type] || '#607D8B';
     }
 
 
-    // Function to render the calendar
+    /**
+     * Construit la légende des types de congés et l'insère dans le DOM.
+     * @param {Array} events - Liste des événements de congé extraits.
+     */
+    function buildLegend(events) {
+        const legendContainer = document.getElementById('legend-container');
+        if (!legendContainer) return;
+
+        // Rassembler les catégories uniques présentes dans les événements
+        const categories = new Set();
+        events.forEach(ev => {
+            categories.add(ev.type);
+        });
+
+        // Déterminer la langue pour les libellés
+        const isFrench = document.body.textContent && document.body.textContent.includes('Congé');
+        const labelMap = {
+            'RTT': 'RTT',
+            'AB-310': 'RTT',
+            'leave': isFrench ? 'Congés payés' : 'Paid Leave',
+            'AB-300': isFrench ? 'Congés payés' : 'Paid Leave',
+            'holiday': isFrench ? 'Jours fériés' : 'Public Holidays',
+            'seniority': isFrench ? 'Ancienneté' : 'Seniority',
+            'AB-631': isFrench ? 'Ancienneté' : 'Seniority',
+            'other': isFrench ? 'Autres' : 'Other'
+        };
+
+        // Ajouter chaque catégorie détectée dans la légende avec sa couleur
+        categories.forEach(type => {
+            // Trouver la couleur correspondante (depuis l'ensemble d'événements)
+            const color = events.find(ev => ev.type === type)?.color || '#607D8B';
+            // Libellé à afficher
+            const label = labelMap[type] || labelMap['other'];
+            const legendItem = document.createElement('div');
+            legendItem.className = 'legend-item';
+            legendItem.innerHTML = `<div class="color-box" style="background-color: ${color};"></div><span>${label}${type.match(/^AB-/) ? '' : ''}</span>`;
+            legendContainer.appendChild(legendItem);
+        });
+
+        // Ajouter manuellement une entrée pour les week-ends (couleur grise) si non ajoutée
+        const weekendLabel = isFrench ? 'Week-ends' : 'Weekends';
+        const weekendItem = document.createElement('div');
+        weekendItem.className = 'legend-item';
+        weekendItem.innerHTML = `<div class="color-box" style="background-color: #f0f0f0;"></div><span>${weekendLabel}</span>`;
+        legendContainer.appendChild(weekendItem);
+    }
+
+    /**
+     * Affiche le calendrier selon la vue actuelle (année ou mois).
+     */
     function renderCalendar() {
-        const calendarContainer = document.getElementById('calendar-container');
+        const calendarContainer = document.getElementById('calendar-display');
         if (!calendarContainer) return;
+        // Effacer le contenu actuel
+        calendarContainer.innerHTML = '';
 
         if (currentView === 'month') {
             renderMonthView(calendarContainer);
@@ -843,261 +497,206 @@
         }
     }
 
-    
-    // Modifier la fonction renderYearView pour assurer une meilleure correspondance des types d'événements
+    /**
+     * Vue Calendrier Annuel (12 mois de l'année courante sur une grille).
+     */
     function renderYearView(container) {
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'];
-        const dayNamesShort = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+        const monthNames = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        const dayNamesShort = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];  // en-têtes des jours (Mon..Sun)
+        // Si besoin, traduire les noms en français
+        const isFrench = document.body.textContent && document.body.textContent.includes('Congé');
+        if (isFrench) {
+            // Remplacer les libellés par leur équivalent français
+            dayNamesShort[0] = 'L';  // Lundi
+            dayNamesShort[1] = 'M';  // Mardi
+            dayNamesShort[2] = 'M';  // Mercredi
+            dayNamesShort[3] = 'J';  // Jeudi
+            dayNamesShort[4] = 'V';  // Vendredi
+            dayNamesShort[5] = 'S';  // Samedi
+            dayNamesShort[6] = 'D';  // Dimanche
+            monthNames[0] = 'Janvier'; monthNames[1] = 'Février';
+            monthNames[2] = 'Mars'; monthNames[3] = 'Avril';
+            monthNames[4] = 'Mai'; monthNames[5] = 'Juin';
+            monthNames[6] = 'Juillet'; monthNames[7] = 'Août';
+            monthNames[8] = 'Septembre'; monthNames[9] = 'Octobre';
+            monthNames[10] = 'Novembre'; monthNames[11] = 'Décembre';
+        }
 
-        // Current date to highlight "today"
         const today = new Date();
         const isCurrentYear = today.getFullYear() === currentYear;
-
-        let yearHTML = `
-        <div class="year-control">
-            <button id="prev-year">◀</button>
-            <h2>${currentYear}</h2>
-            <button id="next-year">▶</button>
-        </div>
-        <div class="year-view">
-    `;
-
-        // Generate a mini-calendar for each month
+        let yearHTML = `<div class="year-control">
+                            <button id="prev-year">◀</button>
+                            <h2>${currentYear}</h2>
+                            <button id="next-year">▶</button>
+                        </div>
+                        <div class="year-view">`;
+        // Générer un mini-calendrier pour chaque mois
         for (let month = 0; month < 12; month++) {
-            yearHTML += `
-            <div class="mini-month">
-                <h4>${monthNames[month]}</h4>
-                <div class="mini-calendar">
-        `;
-
-            // Add day headers
-            dayNamesShort.forEach((day, index) => {
-                const isWeekend = index >= 5; // Sat and Sun are the last two days
-                yearHTML += `<div class="mini-cell header ${isWeekend ? 'weekend' : ''}">${day}</div>`;
+            yearHTML += `<div class="mini-month">
+                            <h4>${monthNames[month]}</h4>
+                            <div class="mini-calendar">`;
+            // En-têtes des jours de la semaine
+            dayNamesShort.forEach((dayName, index) => {
+                const isWeekendHeader = index >= 5;
+                yearHTML += `<div class="mini-cell header ${isWeekendHeader ? 'weekend' : ''}">${dayName}</div>`;
             });
-
-            // Get the first and last day of the month
+            // Calculer les jours du mois
             const firstDay = new Date(currentYear, month, 1);
             const lastDay = new Date(currentYear, month + 1, 0);
-
-            // Adjust to start with Monday (1) instead of Sunday (0)
-            let startingDayIndex = firstDay.getDay() - 1;
-            if (startingDayIndex === -1) startingDayIndex = 6;
-
-            // Previous month days
-            for (let i = 0; i < startingDayIndex; i++) {
-                const isWeekend = i >= 5; // Weekend if index >= 5 (sat and sun)
+            // Faire commencer la semaine le lundi (au lieu de dimanche)
+            let startWeekDay = firstDay.getDay() - 1;
+            if (startWeekDay === -1) startWeekDay = 6;
+            // Jours du mois précédent à afficher en début (cases vides)
+            for (let i = 0; i < startWeekDay; i++) {
+                const isWeekend = i >= 5;
                 yearHTML += `<div class="mini-cell ${isWeekend ? 'weekend' : ''}"></div>`;
             }
-
-            // Current month days
+            // Jours du mois courant
             for (let day = 1; day <= lastDay.getDate(); day++) {
                 const date = new Date(currentYear, month, day);
                 const events = getEventsForDate(date);
                 const dayOfWeek = date.getDay();
-                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // 0 = Sunday, 6 = Saturday
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
                 const isToday = isCurrentYear && today.getMonth() === month && today.getDate() === day;
-
-                // Apply different styles based on events
                 let cellClass = 'mini-cell';
                 if (isToday) cellClass += ' today';
-
-                let title = '';
-
-                // If we have events, color the cell
+                // S'il y a un événement ce jour-là, déterminer la classe correspondante pour la couleur
+                let titleAttr = '';
                 if (events.length > 0) {
-                    // Mapping des types de congés aux classes CSS
-                    const typeToClass = {
-                        'RTT': 'rtt',
-                        'AB-310': 'rtt',
-                        'holiday': 'ferie',
-                        'leave': 'conges',
-                        'AB-300': 'conges',
-                        'seniority': 'anciennete',
-                        'AB-631': 'anciennete'
-                    };
-
-                    // Utiliser le premier événement pour déterminer la couleur
+                    // On prend le premier événement pour déterminer le type principal du jour
                     const firstEvent = events[0];
-                    let typeClass = 'other';
-
-                    // Vérifier d'abord la catégorie
-                    if (typeToClass[firstEvent.type]) {
-                        typeClass = typeToClass[firstEvent.type];
-                    }
-                    // Puis vérifier dans le titre pour les cas spéciaux
-                    else if (firstEvent.title.includes('RTT') || firstEvent.title.includes('AB-310')) {
-                        typeClass = 'rtt';
-                    } else if (firstEvent.title.includes('holiday') || firstEvent.title.includes('ferie') ||
-                        firstEvent.title.includes('Easter') || firstEvent.title.includes('Labour') ||
-                        firstEvent.title.includes('heures for')) {
-                        typeClass = 'ferie';
-                    } else if (firstEvent.title.includes('AB-300') || firstEvent.title.includes('France 20')) {
-                        typeClass = 'conges';
-                    } else if (firstEvent.title.includes('AB-631') || firstEvent.title.includes('Ancienneté')) {
-                        typeClass = 'anciennete';
-                    }
-
+                    let typeClass = firstEvent.type.toLowerCase(); // "holiday", "rtt", etc.
                     cellClass += ` event-${typeClass}`;
-
-                    // Create a title that lists all events
-                    title = events.map(e => e.title).join('\n');
-
-                    console.log(`Événement trouvé pour le ${day}/${month + 1}: Type=${firstEvent.type}, Classe=${typeClass}, Titre="${firstEvent.title}"`);
+                    // Infobulle contenant tous les titres d'événements du jour
+                    titleAttr = events.map(e => e.title).join(" & ");
                 } else if (isWeekend) {
-                    // If it's a weekend without events, use the weekend class
                     cellClass += ' weekend';
                 }
-
-                yearHTML += `<div class="${cellClass}" title="${title}">${day}</div>`;
+                yearHTML += `<div class="${cellClass}" title="${titleAttr}">${day}</div>`;
             }
-
-            // Fill remaining cells (if necessary)
-            const totalDaysVisible = 42; // 6 weeks max
-            const daysShown = startingDayIndex + lastDay.getDate();
-            const remainingCells = (totalDaysVisible - daysShown) % 7;
+            // Compléter les cases manquantes en fin de mois pour avoir une grille complète de 6 semaines (42 jours)
+            const daysShown = startWeekDay + lastDay.getDate();
+            const totalCells = (daysShown <= 35) ? 35 : 42;
+            const remainingCells = totalCells - daysShown;
 
             for (let i = 0; i < remainingCells; i++) {
-                const position = (daysShown + i) % 7;
-                const isWeekend = position >= 5; // The last two columns are weekends
+                const pos = (daysShown + i) % 7;
+                const isWeekend = pos === 5 || pos === 6;
                 yearHTML += `<div class="mini-cell ${isWeekend ? 'weekend' : ''}"></div>`;
             }
-
-            yearHTML += `
-                </div>
-            </div>
-        `;
+            yearHTML += `</div></div>`; // fin .mini-calendar et .mini-month
         }
+        yearHTML += `</div>`; // fin .year-view
 
-        yearHTML += `</div>`;
-
-        // Update the content
         container.innerHTML = yearHTML;
-
-        // Add event listeners for navigation
-        document.getElementById('prev-year').addEventListener('click', () => {
+        // Ajout des gestionnaires d'événements pour naviguer entre les années
+        container.querySelector('#prev-year').addEventListener('click', () => {
             currentYear--;
             renderCalendar();
         });
-
-        document.getElementById('next-year').addEventListener('click', () => {
+        container.querySelector('#next-year').addEventListener('click', () => {
             currentYear++;
             renderCalendar();
         });
     }
 
-    // Modifier également la fonction qui gère la vue mensuelle de manière similaire
+    /**
+     * Vue Calendrier Mensuelle (mois courant par défaut avec navigation).
+     */
     function renderMonthView(container) {
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthNames = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
         const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-        // Current date to highlight "today"
+        const isFrench = document.body.textContent && document.body.textContent.includes('Congé');
+        if (isFrench) {
+            // Traduire les en-têtes si page en français
+            monthNames[0] = 'Janvier'; monthNames[1] = 'Février';
+            monthNames[2] = 'Mars'; monthNames[3] = 'Avril';
+            monthNames[4] = 'Mai'; monthNames[5] = 'Juin';
+            monthNames[6] = 'Juillet'; monthNames[7] = 'Août';
+            monthNames[8] = 'Septembre'; monthNames[9] = 'Octobre';
+            monthNames[10] = 'Novembre'; monthNames[11] = 'Décembre';
+            dayNames[0] = 'Lun'; dayNames[1] = 'Mar'; dayNames[2] = 'Mer';
+            dayNames[3] = 'Jeu'; dayNames[4] = 'Ven'; dayNames[5] = 'Sam'; dayNames[6] = 'Dim';
+        }
         const today = new Date();
-        const isCurrentMonth = (today.getMonth() === currentMonth && today.getFullYear() === currentYear);
+        const isCurrentMonth = (today.getFullYear() === currentYear && today.getMonth() === currentMonth);
 
-        // Generate HTML for navigation controls
-        const navigationHTML = `
-        <div class="month-nav">
-            <button id="prev-month">◀</button>
-            <h3>${monthNames[currentMonth]} ${currentYear}</h3>
-            <button id="next-month">▶</button>
-        </div>
-    `;
-
-        // Create the calendar grid
-        let calendarHTML = `
-        ${navigationHTML}
-        <div class="calendar-grid">
-    `;
-
-        // Add day headers
-        dayNames.forEach((day, index) => {
-            const isWeekend = index >= 5; // Sat and Sun are the last two days
-            calendarHTML += `<div class="calendar-cell header ${isWeekend ? 'weekend' : ''}">${day}</div>`;
-        });
-
-        // Get the first and last day of the month
+        let calendarHTML = `<div class="month-nav">
+                                <button id="prev-month">◀</button>
+                                <h3>${monthNames[currentMonth]} ${currentYear}</h3>
+                                <button id="next-month">▶</button>
+                            </div>
+                            <div class="calendar-grid">`;
+        // En-têtes des jours (ligne des jours de la semaine)
+        for (let i = 0; i < dayNames.length; i++) {
+            const isWeekend = i >= 5;
+            calendarHTML += `<div class="calendar-cell header ${isWeekend ? 'weekend' : ''}">${dayNames[i]}</div>`;
+        }
+        // Calcul du premier jour du mois et du nombre de jours
         const firstDay = new Date(currentYear, currentMonth, 1);
         const lastDay = new Date(currentYear, currentMonth + 1, 0);
-
-        // Adjust to start with Monday (1) instead of Sunday (0)
-        let startingDayIndex = firstDay.getDay() - 1;
-        if (startingDayIndex === -1) startingDayIndex = 6;
-
-        // Previous month days
+        // Commencer le lundi
+        let startWeekDay = firstDay.getDay() - 1;
+        if (startWeekDay === -1) startWeekDay = 6;
+        // Jours du mois précédent visibles
         const prevMonthLastDay = new Date(currentYear, currentMonth, 0).getDate();
-        for (let i = 0; i < startingDayIndex; i++) {
-            const day = prevMonthLastDay - startingDayIndex + i + 1;
-            const isWeekend = i >= 5; // Weekend if index >= 5 (sat and sun)
-            calendarHTML += `<div class="calendar-cell outside-month ${isWeekend ? 'weekend' : ''}"><div class="day-number">${day}</div></div>`;
+        for (let i = 0; i < startWeekDay; i++) {
+            const dayNum = prevMonthLastDay - startWeekDay + i + 1;
+            const isWeekend = i >= 5;
+            calendarHTML += `<div class="calendar-cell outside-month ${isWeekend ? 'weekend' : ''}">
+                                 <div class="day-number">${dayNum}</div>
+                             </div>`;
         }
-
-        // Current month days
+        // Jours du mois courant
         for (let day = 1; day <= lastDay.getDate(); day++) {
             const date = new Date(currentYear, currentMonth, day);
             const events = getEventsForDate(date);
             const dayOfWeek = date.getDay();
-            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // 0 = Sunday, 6 = Saturday
+            const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
             const isToday = isCurrentMonth && today.getDate() === day;
-
-            // Check if the day has events
-            const hasEvents = events.length > 0;
-
-            // Define CSS classes for the cell
+            // Classes de base pour la cellule
             let cellClasses = 'calendar-cell';
-
-            // If we have events, give them priority over the "weekend" marking
             if (isToday) cellClasses += ' today';
-            if (!hasEvents && isWeekend) cellClasses += ' weekend';
+            if (isWeekend && events.length === 0) cellClasses += ' weekend';
 
-            calendarHTML += `<div class="${cellClasses}">
-            <div class="day-number">${day}</div>`;
-
-            // Ajouter des événements
-            if (hasEvents) {
+            calendarHTML += `<div class="${cellClasses}"><div class="day-number">${day}</div>`;
+            // Ajouter les éventuels événements du jour
+            if (events.length > 0) {
                 events.forEach(event => {
-                    // Déterminer la couleur en fonction du type ou de la catégorie
+                    // Utiliser la couleur stockée pour l'événement
                     let eventColor = event.color;
-
-                    // Adapter la couleur si nécessaire
-                    if (event.type === 'RTT' || event.type === 'AB-310' || event.title.includes('RTT')) {
-                        eventColor = '#4CAF50'; // Vert pour RTT
-                    } else if (event.type === 'holiday' || event.title.includes('heures for')) {
-                        eventColor = '#9C27B0'; // Violet pour jours fériés
-                    } else if (event.type === 'leave' || event.type === 'AB-300' || event.title.includes('France 20')) {
-                        eventColor = '#2196F3'; // Bleu pour congés
-                    } else if (event.type === 'seniority' || event.type === 'AB-631' || event.title.includes('Ancienneté')) {
-                        eventColor = '#FF9800'; // Orange pour ancienneté
+                    // Ajuster la couleur si nécessaire pour correspondre aux couleurs fixes souhaitées
+                    if (event.type === 'holiday') {
+                        eventColor = '#9C27B0';  // violet pour jours fériés
                     }
-
-                    calendarHTML += `<div class="calendar-event" style="background-color: ${eventColor};" 
-                     title="${event.title} - ${event.status}">${event.title}</div>`;
+                    const eventTitle = event.title;
+                    const statusText = (event.status === 'Approved') ? (isFrench ? 'Approuvé' : 'Approved') : (isFrench ? 'En attente' : 'Pending');
+                    // Ajouter un bloc événement coloré
+                    calendarHTML += `<div class="calendar-event" style="background-color: ${eventColor};" title="${eventTitle} - ${statusText}">${eventTitle}</div>`;
                 });
             }
-
-            calendarHTML += `</div>`;
+            calendarHTML += `</div>`; // fin .calendar-cell
         }
-
-        // Next month days
-        const daysAfterMonthEnd = 42 - (startingDayIndex + lastDay.getDate());
-        for (let day = 1; day <= daysAfterMonthEnd; day++) {
-            // Calculate if it's a weekend based on the day of the week
-            const date = new Date(currentYear, currentMonth + 1, day);
-            const dayOfWeek = date.getDay();
-            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // 0 = Sunday, 6 = Saturday
-
-            calendarHTML += `<div class="calendar-cell outside-month ${isWeekend ? 'weekend' : ''}"><div class="day-number">${day}</div></div>`;
+        // Jours du mois suivant visibles pour compléter la grille (6 lignes)
+        const totalCellsUsed = startWeekDay + lastDay.getDate();
+        const cellsRemaining = 42 - totalCellsUsed;
+        for (let i = 1; i <= cellsRemaining; i++) {
+            const isWeekend = ((startWeekDay + lastDay.getDate() + i - 1) % 7 >= 5);
+            calendarHTML += `<div class="calendar-cell outside-month ${isWeekend ? 'weekend' : ''}">
+                                 <div class="day-number">${i}</div>
+                             </div>`;
         }
+        calendarHTML += `</div>`; // fin .calendar-grid
 
-        calendarHTML += `</div>`;
-
-        // Update the content
         container.innerHTML = calendarHTML;
-
-        // Add event listeners for navigation
-        document.getElementById('prev-month').addEventListener('click', () => {
+        // Gestion des boutons de navigation mois précédent / suivant
+        container.querySelector('#prev-month').addEventListener('click', () => {
             currentMonth--;
             if (currentMonth < 0) {
                 currentMonth = 11;
@@ -1105,8 +704,7 @@
             }
             renderCalendar();
         });
-
-        document.getElementById('next-month').addEventListener('click', () => {
+        container.querySelector('#next-month').addEventListener('click', () => {
             currentMonth++;
             if (currentMonth > 11) {
                 currentMonth = 0;
@@ -1116,136 +714,161 @@
         });
     }
 
-    // Améliorer également la fonction getEventsForDate pour plus de robustesse
+    /**
+     * Récupère tous les événements (congés) correspondant à une date précise.
+     * @param {Date} date - La date à vérifier.
+     * @returns {Array} Tableau des événements correspondant à la date.
+     */
     function getEventsForDate(date) {
-        if (!timeOffEvents || !Array.isArray(timeOffEvents)) {
-            console.log("Attention: timeOffEvents n'est pas un tableau valide");
-            return [];
-        }
-
-        return timeOffEvents.filter(event => {
-            try {
-                // Éviter les erreurs si les dates ne sont pas valides
-                if (!event.start || !event.end) {
-                    return false;
-                }
-
-                // Create copies of dates to avoid modifying the originals
-                const eventStart = new Date(event.start);
-                const eventEnd = new Date(event.end);
-
-                // Vérifier si les dates sont valides
-                if (isNaN(eventStart.getTime()) || isNaN(eventEnd.getTime())) {
-                    console.log(`Date invalide détectée: début=${event.start}, fin=${event.end}`);
-                    return false;
-                }
-
-                // Normalize dates to have only the date without the time
-                const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-                const normalizedStart = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate());
-                const normalizedEnd = new Date(eventEnd.getFullYear(), eventEnd.getMonth(), eventEnd.getDate());
-
-                // Check if the date is between the start and end of the event (inclusive)
-                return normalizedDate >= normalizedStart && normalizedDate <= normalizedEnd;
-            } catch (error) {
-                console.error("Erreur lors de la comparaison des dates:", error);
-                return false;
-            }
-        });
+        // On utilise l'année extraite dans extractTimeOffData (via closure)
+        // Filtrer les événements extraits dont la date couvre le jour donné
+        return (typeof extractTimeOffData.cached !== 'undefined' ? extractTimeOffData.cached : (extractTimeOffData.cached = extractTimeOffData()))
+            .filter(event => date >= event.start && date <= event.end);
     }
 
-    // Function to clean up existing calendars
-    function cleanupCalendars() {
-        const existingCalendars = document.querySelectorAll('.custom-calendar-container');
-        if (existingCalendars.length > 1) {
-            // Keep only the first calendar, remove the others
-            for (let i = 1; i < existingCalendars.length; i++) {
-                existingCalendars[i].remove();
+    /**
+     * Analyse de texte de date (plage ou date unique) en prenant en charge français/anglais et différents formats.
+     * Retourne un objet { startDate: Date, endDate: Date }.
+     */
+    function parseDateUniversal(dateText) {
+        try {
+            if (DEBUG) console.log(`Analyse de la date: "${dateText}"`);
+            // Normaliser les tirets longs en tirets courts
+            const normalizedText = dateText.replace(/–/g, '-');
+            const isRange = normalizedText.includes('-');
+            const today = new Date();
+            const currentYear = today.getFullYear();
+
+            if (isRange) {
+                // Plage de dates, ex: "12 Jul - 15 Jul" ou "7 juil. - 25 juil."
+                const parts = normalizedText.split('-').map(p => p.trim());
+                // Extraire jours et mois de début et de fin
+                const dayRegex = /(\d+)/g;
+                const monthRegex = /[a-zéèêùûôâ]{3,}/i;
+                const startDayMatch = parts[0].match(dayRegex);
+                const startDay = startDayMatch ? parseInt(startDayMatch[0]) : null;
+                const startMonthMatch = parts[0].match(monthRegex);
+                const startMonthStr = startMonthMatch ? startMonthMatch[0] : null;
+                const endDayMatch = parts[1].match(dayRegex);
+                const endDay = endDayMatch ? parseInt(endDayMatch[0]) : null;
+                let endMonthStr = null;
+                const endMonthMatch = parts[1].match(monthRegex);
+                if (endMonthMatch) {
+                    endMonthStr = endMonthMatch[0];
+                } else {
+                    endMonthStr = startMonthStr;
+                }
+                const startMonthNum = getMonthNumberRobust(startMonthStr);
+                const endMonthNum = getMonthNumberRobust(endMonthStr);
+                if (startDay !== null && endDay !== null && startMonthNum !== -1 && endMonthNum !== -1) {
+                    // Conserver l'année actuelle pour créer les dates
+                    const startDate = new Date(currentYear, startMonthNum, startDay);
+                    const endDate = new Date(currentYear, endMonthNum, endDay);
+                    if (DEBUG) console.log(`Plage interprétée: ${startDate.toDateString()} - ${endDate.toDateString()}`);
+                    return { startDate, endDate };
+                }
+                // Si échec d'interprétation, tenter une approche alternative (cas où le mois n'est mentionné qu'une fois)
+                if (/^\d+$/.test(parts[1]) && startMonthStr) {
+                    const altStartMatch = parts[0].match(/(\d+)\s+([A-Za-zéèêùûôâ.]+)/);
+                    if (altStartMatch) {
+                        const altStartDay = parseInt(altStartMatch[1]);
+                        const altStartMonthStr = altStartMatch[2];
+                        const altStartMonthNum = getMonthNumberRobust(altStartMonthStr);
+                        const altEndDay = parseInt(parts[1]);
+                        if (!isNaN(altEndDay) && altStartMonthNum !== -1) {
+                            const startDate = new Date(currentYear, altStartMonthNum, altStartDay);
+                            const endDate = new Date(currentYear, altStartMonthNum, altEndDay);
+                            if (DEBUG) console.log(`Plage alternative: ${startDate.toDateString()} - ${endDate.toDateString()}`);
+                            return { startDate, endDate };
+                        }
+                    }
+                }
+            } else {
+                // Date simple, ex: "14 juillet" ou "Jul 14"
+                const dayMatch = normalizedText.match(/(\d+)/);
+                const monthMatch = normalizedText.match(/[A-Za-zéèêùûôâ]{3,}/);
+                if (dayMatch && monthMatch) {
+                    const day = parseInt(dayMatch[0]);
+                    const monthStr = monthMatch[0];
+                    const monthNum = getMonthNumberRobust(monthStr);
+                    if (monthNum !== -1) {
+                        const date = new Date(currentYear, monthNum, day);
+                        if (DEBUG) console.log(`Date interprétée: ${date.toDateString()}`);
+                        return { startDate: date, endDate: date };
+                    }
+                }
             }
+            // Échec de l'analyse : retourner la date du jour par défaut
+            if (DEBUG) console.log(`Échec de l'analyse de "${dateText}", retour de la date du jour par défaut.`);
+            return { startDate: new Date(), endDate: new Date() };
+        } catch (error) {
+            console.error("Erreur lors de l'analyse de la date:", error);
+            // En cas d'erreur, retourner la date du jour
+            return { startDate: new Date(), endDate: new Date() };
         }
     }
 
-    // Function to add colored style to "Upcoming Time Off" elements
-    function addStyleToUpcomingTimeOff() {
-        // Wait for elements to load
-        setTimeout(() => {
-            // Find all elements
-            const allElements = document.querySelectorAll('.fabric-163vq54-root span:last-child, .fabric-kv8rfh-root');
+    /**
+     * Convertit un nom de mois (français ou anglais, complet ou abréviation) en numéro de mois (0-11).
+     * @param {string} monthStr - Le nom ou l'abréviation du mois.
+     * @returns {number} Numéro de mois correspondant, ou -1 si inconnu.
+     */
+    function getMonthNumberRobust(monthStr) {
+        if (!monthStr) return -1;
+        const normalized = monthStr.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")  // enlever accents
+            .replace(/[.]/g, "");  // enlever la ponctuation (points abréviations)
+        const monthMap = {
+            // Français
+            'janvier': 0, 'janv': 0, 'jan': 0,
+            'fevrier': 1, 'fevr': 1, 'fev': 1, 'fev': 1,
+            'mars': 2, 'mar': 2,
+            'avril': 3, 'avr': 3,
+            'mai': 4,
+            'juin': 5,
+            'juillet': 6, 'juil': 6, 'jui': 6,
+            'aout': 7, 'août': 7, 'aou': 7, 'ao': 7,
+            'septembre': 8, 'sept': 8, 'sep': 8,
+            'octobre': 9, 'oct': 9,
+            'novembre': 10, 'nov': 10,
+            'decembre': 11, 'dec': 11, 'déc': 11,
+            // Anglais
+            'january': 0, 'jan': 0,
+            'february': 1, 'feb': 1,
+            'march': 2, 'mar': 2,
+            'april': 3, 'apr': 3,
+            'may': 4,
+            'june': 5, 'jun': 5,
+            'july': 6, 'jul': 6,
+            'august': 7, 'aug': 7,
+            'september': 8, 'sept': 8, 'sep': 8,
+            'october': 9, 'oct': 9,
+            'november': 10, 'nov': 10,
+            'december': 11, 'dec': 11,
+            // Allemand
+            'januar': 0, 'jan': 0,
+            'februar': 1, 'feb': 1,
+            'märz': 2, 'maerz': 2, 'mar': 2,
+            'april': 3, 'apr': 3,
+            'mai': 4,
+            'juni': 5, 'jun': 5,
+            'juli': 6, 'jul': 6,
+            'august': 7, 'aug': 7,
+            'september': 8, 'sep': 8,
+            'oktober': 9, 'okt': 9, 'oct': 9,
+            'november': 10, 'nov': 10,
+            'dezember': 11, 'dez': 11, 'dec': 11
 
-            allElements.forEach(el => {
-                const textContent = el.textContent || '';
-
-                // For RTT
-                if (textContent.includes('RTT') || textContent.includes('AB-310')) {
-                    const parentEl = el.closest('.fabric-163vq54-root') || el;
-                    parentEl.style.backgroundColor = 'rgba(76, 175, 80, 0.2)';
-                    parentEl.style.borderRadius = '4px';
-                    parentEl.style.padding = '2px 6px';
-                    parentEl.classList.add('rtt-item');
-                }
-
-                // For paid leave
-                else if (textContent.includes('AB-300')) {
-                    const parentEl = el.closest('.fabric-163vq54-root') || el;
-                    parentEl.style.backgroundColor = 'rgba(33, 150, 243, 0.2)';
-                    parentEl.style.borderRadius = '4px';
-                    parentEl.style.padding = '2px 6px';
-                    parentEl.classList.add('leave-item');
-                }
-
-                // For seniority leave
-                else if (textContent.includes('Ancienneté') || textContent.includes('AB-631')) {
-                    const parentEl = el.closest('.fabric-163vq54-root') || el;
-                    parentEl.style.backgroundColor = 'rgba(255, 152, 0, 0.2)';
-                    parentEl.style.borderRadius = '4px';
-                    parentEl.style.padding = '2px 6px';
-                    parentEl.classList.add('seniority-item');
-                }
-
-                // For public holidays
-                else if (textContent.includes('Easter') ||
-                    textContent.includes('Labour Day') ||
-                    textContent.includes('Victoire') ||
-                    textContent.includes('Ascension Day')) {
-                    const parentEl = el.closest('.fabric-kv8rfh-root') || el;
-                    parentEl.style.backgroundColor = 'rgba(156, 39, 176, 0.2)';
-                    parentEl.style.borderRadius = '4px';
-                    parentEl.style.padding = '2px 6px';
-                    parentEl.classList.add('holiday-item');
-                }
-            });
-        }, 2500);
+        };
+        if (monthMap[normalized] !== undefined) {
+            return monthMap[normalized];
+        }
+        // Essai de correspondance partielle si non trouvé (ex: "févr" pour "février")
+        for (const [name, num] of Object.entries(monthMap)) {
+            if (name.startsWith(normalized) || normalized.startsWith(name)) {
+                return num;
+            }
+        }
+        return -1;
     }
-
-    // Execute our script
-    addCalendarView();
-
-    // Clean up existing calendars after a short delay
-    setTimeout(cleanupCalendars, 3000);
-
-    // Add style to "Upcoming Time Off" elements
-    addStyleToUpcomingTimeOff();
-
-    // Observe DOM changes to re-execute our script if necessary
-    const observer = new MutationObserver(function (mutations) {
-        // Limit to a single instance
-        if (calendarInitialized) {
-            // If we have too many calendars, clean up
-            if (document.querySelectorAll('.custom-calendar-container').length > 1) {
-                cleanupCalendars();
-            }
-            return;
-        }
-
-        if (window.location.href.includes('/employees/pto')) {
-            const calendarExists = document.querySelector('.custom-calendar-container');
-            if (!calendarExists) {
-                addCalendarView();
-                // Reapply style to "Upcoming Time Off" elements
-                addStyleToUpcomingTimeOff();
-            }
-        }
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
 })();
