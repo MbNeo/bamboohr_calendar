@@ -843,7 +843,151 @@
         }
     }
 
-    // Function to render the monthly view
+    
+    // Modifier la fonction renderYearView pour assurer une meilleure correspondance des types d'événements
+    function renderYearView(container) {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+        const dayNamesShort = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+        // Current date to highlight "today"
+        const today = new Date();
+        const isCurrentYear = today.getFullYear() === currentYear;
+
+        let yearHTML = `
+        <div class="year-control">
+            <button id="prev-year">◀</button>
+            <h2>${currentYear}</h2>
+            <button id="next-year">▶</button>
+        </div>
+        <div class="year-view">
+    `;
+
+        // Generate a mini-calendar for each month
+        for (let month = 0; month < 12; month++) {
+            yearHTML += `
+            <div class="mini-month">
+                <h4>${monthNames[month]}</h4>
+                <div class="mini-calendar">
+        `;
+
+            // Add day headers
+            dayNamesShort.forEach((day, index) => {
+                const isWeekend = index >= 5; // Sat and Sun are the last two days
+                yearHTML += `<div class="mini-cell header ${isWeekend ? 'weekend' : ''}">${day}</div>`;
+            });
+
+            // Get the first and last day of the month
+            const firstDay = new Date(currentYear, month, 1);
+            const lastDay = new Date(currentYear, month + 1, 0);
+
+            // Adjust to start with Monday (1) instead of Sunday (0)
+            let startingDayIndex = firstDay.getDay() - 1;
+            if (startingDayIndex === -1) startingDayIndex = 6;
+
+            // Previous month days
+            for (let i = 0; i < startingDayIndex; i++) {
+                const isWeekend = i >= 5; // Weekend if index >= 5 (sat and sun)
+                yearHTML += `<div class="mini-cell ${isWeekend ? 'weekend' : ''}"></div>`;
+            }
+
+            // Current month days
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+                const date = new Date(currentYear, month, day);
+                const events = getEventsForDate(date);
+                const dayOfWeek = date.getDay();
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // 0 = Sunday, 6 = Saturday
+                const isToday = isCurrentYear && today.getMonth() === month && today.getDate() === day;
+
+                // Apply different styles based on events
+                let cellClass = 'mini-cell';
+                if (isToday) cellClass += ' today';
+
+                let title = '';
+
+                // If we have events, color the cell
+                if (events.length > 0) {
+                    // Mapping des types de congés aux classes CSS
+                    const typeToClass = {
+                        'RTT': 'rtt',
+                        'AB-310': 'rtt',
+                        'holiday': 'ferie',
+                        'leave': 'conges',
+                        'AB-300': 'conges',
+                        'seniority': 'anciennete',
+                        'AB-631': 'anciennete'
+                    };
+
+                    // Utiliser le premier événement pour déterminer la couleur
+                    const firstEvent = events[0];
+                    let typeClass = 'other';
+
+                    // Vérifier d'abord la catégorie
+                    if (typeToClass[firstEvent.type]) {
+                        typeClass = typeToClass[firstEvent.type];
+                    }
+                    // Puis vérifier dans le titre pour les cas spéciaux
+                    else if (firstEvent.title.includes('RTT') || firstEvent.title.includes('AB-310')) {
+                        typeClass = 'rtt';
+                    } else if (firstEvent.title.includes('holiday') || firstEvent.title.includes('ferie') ||
+                        firstEvent.title.includes('Easter') || firstEvent.title.includes('Labour') ||
+                        firstEvent.title.includes('heures for')) {
+                        typeClass = 'ferie';
+                    } else if (firstEvent.title.includes('AB-300') || firstEvent.title.includes('France 20')) {
+                        typeClass = 'conges';
+                    } else if (firstEvent.title.includes('AB-631') || firstEvent.title.includes('Ancienneté')) {
+                        typeClass = 'anciennete';
+                    }
+
+                    cellClass += ` event-${typeClass}`;
+
+                    // Create a title that lists all events
+                    title = events.map(e => e.title).join('\n');
+
+                    console.log(`Événement trouvé pour le ${day}/${month + 1}: Type=${firstEvent.type}, Classe=${typeClass}, Titre="${firstEvent.title}"`);
+                } else if (isWeekend) {
+                    // If it's a weekend without events, use the weekend class
+                    cellClass += ' weekend';
+                }
+
+                yearHTML += `<div class="${cellClass}" title="${title}">${day}</div>`;
+            }
+
+            // Fill remaining cells (if necessary)
+            const totalDaysVisible = 42; // 6 weeks max
+            const daysShown = startingDayIndex + lastDay.getDate();
+            const remainingCells = (totalDaysVisible - daysShown) % 7;
+
+            for (let i = 0; i < remainingCells; i++) {
+                const position = (daysShown + i) % 7;
+                const isWeekend = position >= 5; // The last two columns are weekends
+                yearHTML += `<div class="mini-cell ${isWeekend ? 'weekend' : ''}"></div>`;
+            }
+
+            yearHTML += `
+                </div>
+            </div>
+        `;
+        }
+
+        yearHTML += `</div>`;
+
+        // Update the content
+        container.innerHTML = yearHTML;
+
+        // Add event listeners for navigation
+        document.getElementById('prev-year').addEventListener('click', () => {
+            currentYear--;
+            renderCalendar();
+        });
+
+        document.getElementById('next-year').addEventListener('click', () => {
+            currentYear++;
+            renderCalendar();
+        });
+    }
+
+    // Modifier également la fonction qui gère la vue mensuelle de manière similaire
     function renderMonthView(container) {
         const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
             'July', 'August', 'September', 'October', 'November', 'December'];
@@ -855,18 +999,18 @@
 
         // Generate HTML for navigation controls
         const navigationHTML = `
-            <div class="month-nav">
-                <button id="prev-month">◀</button>
-                <h3>${monthNames[currentMonth]} ${currentYear}</h3>
-                <button id="next-month">▶</button>
-            </div>
-        `;
+        <div class="month-nav">
+            <button id="prev-month">◀</button>
+            <h3>${monthNames[currentMonth]} ${currentYear}</h3>
+            <button id="next-month">▶</button>
+        </div>
+    `;
 
         // Create the calendar grid
         let calendarHTML = `
-            ${navigationHTML}
-            <div class="calendar-grid">
-        `;
+        ${navigationHTML}
+        <div class="calendar-grid">
+    `;
 
         // Add day headers
         dayNames.forEach((day, index) => {
@@ -909,12 +1053,31 @@
             if (!hasEvents && isWeekend) cellClasses += ' weekend';
 
             calendarHTML += `<div class="${cellClasses}">
-                <div class="day-number">${day}</div>
-                ${events.map(event =>
-                `<div class="calendar-event" style="background-color: ${event.color};" 
-                         title="${event.title} - ${event.status}">${event.title}</div>`
-            ).join('')}
-            </div>`;
+            <div class="day-number">${day}</div>`;
+
+            // Ajouter des événements
+            if (hasEvents) {
+                events.forEach(event => {
+                    // Déterminer la couleur en fonction du type ou de la catégorie
+                    let eventColor = event.color;
+
+                    // Adapter la couleur si nécessaire
+                    if (event.type === 'RTT' || event.type === 'AB-310' || event.title.includes('RTT')) {
+                        eventColor = '#4CAF50'; // Vert pour RTT
+                    } else if (event.type === 'holiday' || event.title.includes('heures for')) {
+                        eventColor = '#9C27B0'; // Violet pour jours fériés
+                    } else if (event.type === 'leave' || event.type === 'AB-300' || event.title.includes('France 20')) {
+                        eventColor = '#2196F3'; // Bleu pour congés
+                    } else if (event.type === 'seniority' || event.type === 'AB-631' || event.title.includes('Ancienneté')) {
+                        eventColor = '#FF9800'; // Orange pour ancienneté
+                    }
+
+                    calendarHTML += `<div class="calendar-event" style="background-color: ${eventColor};" 
+                     title="${event.title} - ${event.status}">${event.title}</div>`;
+                });
+            }
+
+            calendarHTML += `</div>`;
         }
 
         // Next month days
@@ -953,130 +1116,41 @@
         });
     }
 
-    // Function to render the annual view
-    function renderYearView(container) {
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'];
-        const dayNamesShort = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-        // Current date to highlight "today"
-        const today = new Date();
-        const isCurrentYear = today.getFullYear() === currentYear;
-
-        let yearHTML = `
-            <div class="year-control">
-                <button id="prev-year">◀</button>
-                <h2>${currentYear}</h2>
-                <button id="next-year">▶</button>
-            </div>
-            <div class="year-view">
-        `;
-
-        // Generate a mini-calendar for each month
-        for (let month = 0; month < 12; month++) {
-            yearHTML += `
-                <div class="mini-month">
-                    <h4>${monthNames[month]}</h4>
-                    <div class="mini-calendar">
-            `;
-
-            // Add day headers
-            dayNamesShort.forEach((day, index) => {
-                const isWeekend = index >= 5; // Sat and Sun are the last two days
-                yearHTML += `<div class="mini-cell header ${isWeekend ? 'weekend' : ''}">${day}</div>`;
-            });
-
-            // Get the first and last day of the month
-            const firstDay = new Date(currentYear, month, 1);
-            const lastDay = new Date(currentYear, month + 1, 0);
-
-            // Adjust to start with Monday (1) instead of Sunday (0)
-            let startingDayIndex = firstDay.getDay() - 1;
-            if (startingDayIndex === -1) startingDayIndex = 6;
-
-            // Previous month days
-            for (let i = 0; i < startingDayIndex; i++) {
-                const isWeekend = i >= 5; // Weekend if index >= 5 (sat and sun)
-                yearHTML += `<div class="mini-cell ${isWeekend ? 'weekend' : ''}"></div>`;
-            }
-
-            // Current month days
-            for (let day = 1; day <= lastDay.getDate(); day++) {
-                const date = new Date(currentYear, month, day);
-                const events = getEventsForDate(date);
-                const dayOfWeek = date.getDay();
-                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // 0 = Sunday, 6 = Saturday
-                const isToday = isCurrentYear && today.getMonth() === month && today.getDate() === day;
-
-                // Apply different styles based on events
-                let cellClass = 'mini-cell';
-                if (isToday) cellClass += ' today';
-
-                let title = '';
-
-                // If we have events, color the cell
-                if (events.length > 0) {
-                    // Use the first event to determine the color
-                    cellClass += ` event-${events[0].type}`;
-
-                    // Create a title that lists all events
-                    title = events.map(e => e.title).join('\n');
-                } else if (isWeekend) {
-                    // If it's a weekend without events, use the weekend class
-                    cellClass += ' weekend';
-                }
-
-                yearHTML += `<div class="${cellClass}" title="${title}">${day}</div>`;
-            }
-
-            // Fill remaining cells (if necessary)
-            const totalDaysVisible = 42; // 6 weeks max
-            const daysShown = startingDayIndex + lastDay.getDate();
-            const remainingCells = (totalDaysVisible - daysShown) % 7;
-
-            for (let i = 0; i < remainingCells; i++) {
-                const position = (daysShown + i) % 7;
-                const isWeekend = position >= 5; // The last two columns are weekends
-                yearHTML += `<div class="mini-cell ${isWeekend ? 'weekend' : ''}"></div>`;
-            }
-
-            yearHTML += `
-                    </div>
-                </div>
-            `;
+    // Améliorer également la fonction getEventsForDate pour plus de robustesse
+    function getEventsForDate(date) {
+        if (!timeOffEvents || !Array.isArray(timeOffEvents)) {
+            console.log("Attention: timeOffEvents n'est pas un tableau valide");
+            return [];
         }
 
-        yearHTML += `</div>`;
-
-        // Update the content
-        container.innerHTML = yearHTML;
-
-        // Add event listeners for navigation
-        document.getElementById('prev-year').addEventListener('click', () => {
-            currentYear--;
-            renderCalendar();
-        });
-
-        document.getElementById('next-year').addEventListener('click', () => {
-            currentYear++;
-            renderCalendar();
-        });
-    }
-
-    // Function to get events for a given date
-    function getEventsForDate(date) {
         return timeOffEvents.filter(event => {
-            // Create copies of dates to avoid modifying the originals
-            const eventStart = new Date(event.start);
-            const eventEnd = new Date(event.end);
+            try {
+                // Éviter les erreurs si les dates ne sont pas valides
+                if (!event.start || !event.end) {
+                    return false;
+                }
 
-            // Normalize dates to have only the date without the time
-            const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-            const normalizedStart = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate());
-            const normalizedEnd = new Date(eventEnd.getFullYear(), eventEnd.getMonth(), eventEnd.getDate());
+                // Create copies of dates to avoid modifying the originals
+                const eventStart = new Date(event.start);
+                const eventEnd = new Date(event.end);
 
-            // Check if the date is between the start and end of the event (inclusive)
-            return normalizedDate >= normalizedStart && normalizedDate <= normalizedEnd;
+                // Vérifier si les dates sont valides
+                if (isNaN(eventStart.getTime()) || isNaN(eventEnd.getTime())) {
+                    console.log(`Date invalide détectée: début=${event.start}, fin=${event.end}`);
+                    return false;
+                }
+
+                // Normalize dates to have only the date without the time
+                const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                const normalizedStart = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate());
+                const normalizedEnd = new Date(eventEnd.getFullYear(), eventEnd.getMonth(), eventEnd.getDate());
+
+                // Check if the date is between the start and end of the event (inclusive)
+                return normalizedDate >= normalizedStart && normalizedDate <= normalizedEnd;
+            } catch (error) {
+                console.error("Erreur lors de la comparaison des dates:", error);
+                return false;
+            }
         });
     }
 
