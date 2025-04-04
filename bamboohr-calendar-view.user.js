@@ -354,6 +354,7 @@
     }
 
     // Fonction améliorée pour extraire les données de congés de manière générique
+    // Fonction améliorée pour extraire les données de congés - compatible multilingue
     function extractTimeOffData() {
         const timeOffEvents = [];
         const processedItems = new Set(); // Pour éviter les doublons
@@ -380,143 +381,191 @@
         try {
             console.log("Recherche d'éléments de congés...");
 
-            // Approche générique pour trouver tous les éléments qui contiennent potentiellement des informations de congés
-            const allPossibleItems = document.querySelectorAll('.MuiBox-root, .fabric-5qovnk-root');
+            // Approche encore plus générique pour trouver des éléments de congés
+            // On cherche toutes les sections qui pourraient contenir des congés
+            const allSections = document.querySelectorAll('section, .MuiBox-root, .fabric-5qovnk-root');
 
-            // Filtrer pour ne garder que les éléments qui contiennent probablement des congés
-            const upcomingTimeOffItems = Array.from(allPossibleItems).filter(item => {
-                // Vérifier si l'élément contient une date
-                const hasDate = item.querySelector('.fabric-10enqx8-root') ||
-                    item.querySelector('.MuiTypography-root') ||
-                    item.querySelector('p');
+            // Rechercher d'abord la section principale
+            let mainSection = null;
+
+            for (const section of allSections) {
+                // Rechercher du texte qui pourrait indiquer une section de congés
+                const sectionText = section.textContent || '';
+                if (sectionText.includes('Congés à venir') ||
+                    sectionText.includes('Upcoming Time Off') ||
+                    sectionText.includes('Congé') ||
+                    sectionText.includes('Leave') ||
+                    sectionText.includes('Holiday')) {
+                    mainSection = section;
+                    console.log('Section principale de congés trouvée:', sectionText.substring(0, 30));
+                    break;
+                }
+            }
+
+            if (!mainSection) {
+                console.log('Aucune section de congés trouvée, utilisation de la page entière');
+                mainSection = document.body;
+            }
+
+            // Chercher les éléments potentiels de congés dans la section ou sur la page
+            // Approche 1: Rechercher des éléments qui ressemblent à des entrées de congés
+            const leaveItems = [];
+
+            // Structure typique des lignes de congés
+            const candidateRows = mainSection.querySelectorAll('.MuiBox-root.css-1lekzkb, .fabric-5qovnk-root.MuiBox-root');
+
+            candidateRows.forEach(row => {
+                // Vérifier si la ligne contient une date et une description
+                const hasDate = row.querySelector('.fabric-10enqx8-root p, .MuiTypography-root, p') !== null;
 
                 // Vérifier s'il contient du texte qui ressemble à un congé
-                const hasLeaveIndicator = item.textContent.includes('AB-') ||
-                    /jour|day|RTT|leave|congé|holiday|vacation/i.test(item.textContent);
+                const rowText = row.textContent || '';
+                const isLeaveRow = rowText.includes('jour') ||
+                    rowText.includes('day') ||
+                    rowText.includes('RTT') ||
+                    rowText.includes('congé') ||
+                    rowText.includes('leave') ||
+                    rowText.includes('holiday') ||
+                    rowText.includes('vacation') ||
+                    rowText.includes('AB-');
 
-                return hasDate && hasLeaveIndicator;
+                if (hasDate && isLeaveRow) {
+                    leaveItems.push(row);
+                }
             });
 
-            console.log(`Trouvé ${upcomingTimeOffItems.length} éléments potentiels de congés`);
+            console.log(`Trouvé ${leaveItems.length} éléments potentiels de congés`);
 
-            // Traiter chaque élément
-            upcomingTimeOffItems.forEach((item, index) => {
+            // Parcourir les éléments
+            leaveItems.forEach((item, index) => {
                 try {
-                    console.log(`Traitement de l'élément ${index}:`, item.textContent.substring(0, 50) + "...");
-
-                    // Générer un identifiant unique pour cet élément
-                    const itemId = `item_${index}_${item.textContent.length}`;
+                    // Générer un identifiant unique basé sur le contenu de l'élément
+                    const itemText = item.textContent || '';
+                    const itemId = `item_${index}_${itemText.length}`;
 
                     if (processedItems.has(itemId)) {
                         return; // Éviter les doublons
                     }
                     processedItems.add(itemId);
 
-                    // Trouver la date - utiliser une approche générique
+                    // Rechercher l'élément de date (premier élément contenant du texte qui ressemble à une date)
                     let dateText = '';
-                    const dateElements = [
-                        item.querySelector('.MuiTypography-root.fabric-162rsfc-medium-root'),
-                        item.querySelector('.fabric-10enqx8-root p'),
-                        item.querySelector('p.MuiTypography-root')
-                    ];
+                    let dateElement = null;
 
-                    for (const el of dateElements) {
-                        if (el && el.textContent.trim()) {
-                            dateText = el.textContent.trim();
-                            // Vérifier si le texte ressemble à une date
-                            if (/\d+\s*[a-zéûù.]+/i.test(dateText)) {
+                    // Chercher tous les éléments qui pourraient contenir une date
+                    const allElements = item.querySelectorAll('*');
+                    for (const el of allElements) {
+                        const text = el.textContent || '';
+                        // Détecter si le texte ressemble à une date (contient un chiffre et un mois)
+                        if (/\d+\s*[a-zéûùàâê.]/i.test(text) && text.length < 30) {
+                            dateText = text.trim();
+                            dateElement = el;
+                            break;
+                        }
+                    }
+
+                    if (!dateText) {
+                        console.log(`Pas de date trouvée pour l'élément ${index}`);
+                        return;
+                    }
+
+                    console.log(`Date trouvée: "${dateText}"`);
+
+                    // Trouver le type de congé en cherchant dans les éléments qui ne sont pas la date
+                    let typeText = '';
+
+                    // Chercher des éléments avec classes spécifiques
+                    const typeElements = item.querySelectorAll('.fabric-kv8rfh-root, .fabric-163vq54-root, p');
+
+                    for (const el of typeElements) {
+                        // Ignorer l'élément de date
+                        if (el === dateElement || el.contains(dateElement) || dateElement?.contains(el)) {
+                            continue;
+                        }
+
+                        const text = el.textContent || '';
+                        if (text &&
+                            (text.includes('jour') || text.includes('day') ||
+                                text.includes('RTT') || text.includes('AB-') ||
+                                text.includes('heures') || text.includes('hours'))) {
+                            typeText = text.trim();
+                            break;
+                        }
+                    }
+
+                    // Si aucun type spécifique n'est trouvé, prendre tout texte non-date
+                    if (!typeText) {
+                        for (const el of allElements) {
+                            // Ignorer l'élément de date
+                            if (el === dateElement || el.contains(dateElement) || dateElement?.contains(el)) {
+                                continue;
+                            }
+
+                            const text = el.textContent || '';
+                            if (text && text !== dateText && text.length > 3) {
+                                typeText = text.trim();
                                 break;
                             }
                         }
                     }
 
-                    if (!dateText) {
-                        return; // Pas de date trouvée, ignorer cet élément
-                    }
-
-                    console.log(`Date trouvée: "${dateText}"`);
-
-                    // Trouver le type de congé - approche générique
-                    let typeText = '';
-                    const allChildren = item.querySelectorAll('*');
-
-                    // Collecter tous les textes des enfants qui ne sont pas la date
-                    const childTexts = [];
-                    allChildren.forEach(child => {
-                        const text = child.textContent.trim();
-                        if (text && text !== dateText && !childTexts.includes(text)) {
-                            childTexts.push(text);
-                        }
-                    });
-
-                    // Rechercher un texte qui ressemble à un type de congé
-                    for (const text of childTexts) {
-                        if (/AB-\d+|jour|day|RTT|leave|congé|holiday|vacation|heures/i.test(text)) {
-                            typeText = text;
-                            break;
-                        }
-                    }
-
-                    // Si on n'a toujours pas trouvé, prendre le premier texte non-date
-                    if (!typeText && childTexts.length > 0) {
-                        typeText = childTexts[0];
-                    }
-
                     if (!typeText) {
-                        return; // Pas de type trouvé, ignorer cet élément
+                        console.log(`Pas de type trouvé pour la date: ${dateText}`);
+                        // Utiliser un type par défaut si rien n'est trouvé
+                        typeText = "Congé";
                     }
 
                     console.log(`Type trouvé: "${typeText}"`);
 
-                    // Déterminer si le congé est approuvé
-                    const isApproved = item.textContent.includes('Approved') ||
+                    // Vérifier si approuvé
+                    const isApproved =
+                        item.textContent.includes('Approved') ||
                         item.textContent.includes('Approuvé') ||
                         item.querySelector('svg[viewBox="0 0 512 512"]') !== null;
 
-                    // Analyser la date de manière générique
-                    const { startDate, endDate } = parseDateGeneric(dateText);
+                    // Analyser la date - approche universelle
+                    const dateInfo = parseDateUniversal(dateText);
 
-                    if (!startDate || !endDate) {
+                    if (!dateInfo.startDate || !dateInfo.endDate) {
                         console.log(`Impossible d'analyser les dates: ${dateText}`);
                         return;
                     }
 
-                    // Déterminer la catégorie de congé
+                    // Déterminer la catégorie de congé de manière plus robuste
                     let typeCategory = 'other';
 
-                    // Extraire l'identifiant AB-XXX s'il existe
+                    // Extraire les codes AB si présents
                     const abMatch = typeText.match(/AB-(\d+)/i);
                     if (abMatch) {
                         typeCategory = `AB-${abMatch[1]}`;
                     }
-                    // Sinon, essayer de déterminer le type de manière plus générique
+                    // Sinon, utiliser d'autres indices textuels
                     else if (/RTT/i.test(typeText)) {
                         typeCategory = 'RTT';
-                    } else if (/holiday|férié|ferie|public/i.test(typeText)) {
+                    } else if (/holiday|férié|ferie|public|easter|monday|labour|ascension|victoire/i.test(typeText)) {
                         typeCategory = 'holiday';
-                    } else if (/congé|leave|vacation/i.test(typeText)) {
+                    } else if (/congé|leave|vacation|france 20\d{2}|AB-300/i.test(typeText)) {
                         typeCategory = 'leave';
-                    } else if (/ancienneté|seniority/i.test(typeText)) {
+                    } else if (/ancienneté|seniority|AB-631/i.test(typeText)) {
                         typeCategory = 'seniority';
                     }
 
-                    // Attribuer une couleur cohérente basée sur la catégorie
+                    // Attribution cohérente des couleurs
                     let eventColor;
 
                     if (typeColorMap.has(typeCategory)) {
                         eventColor = typeColorMap.get(typeCategory);
                     } else {
-                        // Attribuer une nouvelle couleur de la liste prédéfinie
                         const colorIndex = typeColorMap.size % predefinedColors.length;
                         eventColor = predefinedColors[colorIndex];
                         typeColorMap.set(typeCategory, eventColor);
                     }
 
-                    // Ajouter l'événement
+                    // Ajouter l'événement au calendrier
                     timeOffEvents.push({
                         title: typeText,
-                        start: startDate,
-                        end: endDate,
+                        start: dateInfo.startDate,
+                        end: dateInfo.endDate,
                         color: eventColor,
                         type: typeCategory,
                         status: isApproved ? 'Approved' : 'Pending'
@@ -526,29 +575,31 @@
                         date: dateText,
                         type: typeText,
                         category: typeCategory,
-                        color: eventColor
+                        color: eventColor,
+                        start: dateInfo.startDate.toLocaleDateString(),
+                        end: dateInfo.endDate.toLocaleDateString()
                     });
 
                 } catch (itemError) {
-                    console.error('Erreur de traitement:', itemError);
+                    console.error(`Erreur de traitement de l'élément ${index}:`, itemError);
                 }
             });
 
-            // Éliminer les vrais doublons (même date, même type)
+            // Éliminer les doublons potentiels
             const dedupedEvents = [];
             const eventKeys = new Set();
 
             timeOffEvents.forEach(event => {
-                const key = `${event.start.toDateString()}_${event.type}`;
+                const key = `${event.start.toDateString()}_${event.end.toDateString()}_${event.type}`;
                 if (!eventKeys.has(key)) {
                     eventKeys.add(key);
                     dedupedEvents.push(event);
                 }
             });
 
-            console.log(`Événements finaux: ${dedupedEvents.length}`);
+            console.log(`Événements finaux après déduplication: ${dedupedEvents.length}`);
 
-            // Afficher le mappage des couleurs pour référence
+            // Afficher le mappage des types aux couleurs
             console.log("Mappage des types de congés aux couleurs:");
             typeColorMap.forEach((color, type) => {
                 console.log(`${type}: ${color}`);
@@ -556,112 +607,125 @@
 
             return dedupedEvents;
         } catch (error) {
-            console.error('Erreur globale:', error);
+            console.error('Erreur globale d\'extraction:', error);
             return [];
         }
     }
 
-    // Fonction générique pour analyser les dates dans différentes langues
-    function parseDateGeneric(dateText) {
+    // Fonction très robuste d'analyse des dates dans différentes langues et formats
+    function parseDateUniversal(dateText) {
         try {
-            // Détecter si c'est une plage de dates ou une date unique
-            const isRange = dateText.includes('–') || dateText.includes('-');
+            console.log(`Analyse de la date: "${dateText}"`);
+
+            // Normaliser les séparateurs de plage
+            const normalizedText = dateText.replace(/–/g, '-');
+
+            // Détecter si c'est une plage de dates
+            const isRange = normalizedText.includes('-');
 
             if (isRange) {
-                // Plage de dates
-                const separator = dateText.includes('–') ? '–' : '-';
-                const [startPart, endPart] = dateText.split(separator).map(p => p.trim());
+                // Séparer la plage
+                const parts = normalizedText.split('-').map(p => p.trim());
 
-                // Extraire le jour et le mois de début
-                const startMatches = startPart.match(/(\d+)(?:\s+|\.)([a-zéûù.]+)(?:\s+|\.)?\s*(\d{4})?/i);
+                // Extraction des valeurs numériques (jours)
+                const dayRegex = /(\d+)/g;
 
-                if (!startMatches) {
-                    console.log(`Format de date de début non reconnu: ${startPart}`);
-                    return { startDate: null, endDate: null };
-                }
+                // Extraction des chaînes de mois potentielles
+                const monthRegex = /[a-zéèêùûôâ]{3,}/gi;
 
-                const startDay = parseInt(startMatches[1]);
-                let startMonthStr = startMatches[2].toLowerCase().replace(/\./g, '');
-                const startYear = startMatches[3] ? parseInt(startMatches[3]) : currentYear;
+                // Pour la partie de début
+                const startDayMatches = parts[0].match(dayRegex);
+                const startDay = startDayMatches ? parseInt(startDayMatches[0]) : null;
 
-                const startMonth = getMonthNumberUniversal(startMonthStr);
-                if (startMonth === -1) {
-                    console.log(`Mois de début non reconnu: ${startMonthStr}`);
-                    return { startDate: null, endDate: null };
-                }
+                const startMonthMatches = parts[0].match(monthRegex);
+                const startMonthStr = startMonthMatches ? startMonthMatches[0].trim().toLowerCase() : null;
 
-                // Extraire le jour et le mois de fin
-                let endDay, endMonth, endYear;
+                // Pour la partie de fin
+                const endDayMatches = parts[1].match(dayRegex);
+                const endDay = endDayMatches ? parseInt(endDayMatches[0]) : null;
 
-                if (endPart.includes(' ')) {
-                    // Format "9 mai - 10 juin"
-                    const endMatches = endPart.match(/(\d+)(?:\s+|\.)([a-zéûù.]+)(?:\s+|\.)?\s*(\d{4})?/i);
+                let endMonthStr = null;
+                const endMonthMatches = parts[1].match(monthRegex);
 
-                    if (!endMatches) {
-                        console.log(`Format de date de fin non reconnu: ${endPart}`);
-                        return { startDate: null, endDate: null };
-                    }
-
-                    endDay = parseInt(endMatches[1]);
-                    let endMonthStr = endMatches[2].toLowerCase().replace(/\./g, '');
-                    endYear = endMatches[3] ? parseInt(endMatches[3]) : startYear;
-
-                    endMonth = getMonthNumberUniversal(endMonthStr);
-                    if (endMonth === -1) {
-                        console.log(`Mois de fin non reconnu: ${endMonthStr}`);
-                        return { startDate: null, endDate: null };
-                    }
+                if (endMonthMatches) {
+                    // La partie de fin contient un mois
+                    endMonthStr = endMonthMatches[0].trim().toLowerCase();
                 } else {
-                    // Format "9 - 10 mai" (même mois)
-                    const endDayMatch = endPart.match(/\d+/);
-                    if (!endDayMatch) {
-                        console.log(`Jour de fin non reconnu: ${endPart}`);
-                        return { startDate: null, endDate: null };
-                    }
-
-                    endDay = parseInt(endDayMatch[0]);
-                    endMonth = startMonth;
-                    endYear = startYear;
+                    // Même mois que la partie de début
+                    endMonthStr = startMonthStr;
                 }
 
-                return {
-                    startDate: new Date(startYear, startMonth, startDay),
-                    endDate: new Date(endYear, endMonth, endDay)
-                };
+                // Convertir les chaînes de mois en numéros de mois
+                const startMonth = getMonthNumberRobust(startMonthStr);
+                const endMonth = getMonthNumberRobust(endMonthStr);
 
+                console.log(`Plage de dates analysée: du ${startDay} ${startMonthStr} (mois ${startMonth}) au ${endDay} ${endMonthStr} (mois ${endMonth})`);
+
+                // Année en cours
+                const currentYear = new Date().getFullYear();
+
+                if (startDay !== null && startMonth !== -1 && endDay !== null && endMonth !== -1) {
+                    return {
+                        startDate: new Date(currentYear, startMonth, startDay),
+                        endDate: new Date(currentYear, endMonth, endDay)
+                    };
+                }
             } else {
                 // Date unique
-                const matches = dateText.match(/(\d+)(?:\s+|\.)([a-zéûù.]+)(?:\s+|\.)?\s*(\d{4})?/i);
+                const dayMatch = normalizedText.match(/(\d+)/);
+                const monthMatch = normalizedText.match(/[a-zéèêùûôâ]{3,}/i);
 
-                if (!matches) {
-                    console.log(`Format de date unique non reconnu: ${dateText}`);
-                    return { startDate: null, endDate: null };
+                if (dayMatch && monthMatch) {
+                    const day = parseInt(dayMatch[0]);
+                    const monthStr = monthMatch[0].trim().toLowerCase();
+                    const month = getMonthNumberRobust(monthStr);
+
+                    console.log(`Date unique analysée: ${day} ${monthStr} (mois ${month})`);
+
+                    if (month !== -1) {
+                        const currentYear = new Date().getFullYear();
+                        const date = new Date(currentYear, month, day);
+                        return { startDate: date, endDate: date };
+                    }
                 }
-
-                const day = parseInt(matches[1]);
-                let monthStr = matches[2].toLowerCase().replace(/\./g, '');
-                const year = matches[3] ? parseInt(matches[3]) : currentYear;
-
-                const month = getMonthNumberUniversal(monthStr);
-                if (month === -1) {
-                    console.log(`Mois non reconnu: ${monthStr}`);
-                    return { startDate: null, endDate: null };
-                }
-
-                const date = new Date(year, month, day);
-                return { startDate: date, endDate: date };
             }
+
+            // Échec de l'analyse, retourner des valeurs nulles
+            console.log(`Échec de l'analyse pour: "${dateText}"`);
+            return { startDate: null, endDate: null };
+
         } catch (error) {
             console.error('Erreur d\'analyse de date:', error);
             return { startDate: null, endDate: null };
         }
     }
 
-    // Fonction universelle pour obtenir le numéro de mois à partir d'une chaîne
-    function getMonthNumberUniversal(monthStr) {
-        // Table universelle de correspondance pour les mois dans différentes langues
-        const monthMap = {
-            // Anglais (complet et abrégé)
+    // Fonction très robuste de reconnaissance des mois dans différentes langues
+    function getMonthNumberRobust(monthStr) {
+        if (!monthStr) return -1;
+
+        // Normaliser la chaîne
+        const normalized = monthStr.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Enlever les accents
+            .replace(/[.,]/g, ''); // Enlever la ponctuation
+
+        // Mappages de mois très complets (y compris les abréviations courantes)
+        const monthMappings = {
+            // Français
+            'janvier': 0, 'jan': 0, 'janv': 0, 'ja': 0,
+            'fevrier': 1, 'fev': 1, 'fe': 1, 'fév': 1, 'févr': 1,
+            'mars': 2, 'mar': 2, 'ma': 2,
+            'avril': 3, 'avr': 3, 'av': 3,
+            'mai': 4,
+            'juin': 5, 'jui': 5, 'jun': 5,
+            'juillet': 6, 'juil': 6, 'jul': 6,
+            'aout': 7, 'août': 7, 'aou': 7, 'au': 7, 'aug': 7,
+            'septembre': 8, 'sept': 8, 'sep': 8, 'se': 8,
+            'octobre': 9, 'oct': 9, 'oc': 9,
+            'novembre': 10, 'nov': 10, 'no': 10,
+            'decembre': 11, 'dec': 11, 'de': 11, 'déc': 11,
+
+            // Anglais
             'january': 0, 'jan': 0,
             'february': 1, 'feb': 1,
             'march': 2, 'mar': 2,
@@ -673,56 +737,43 @@
             'september': 8, 'sep': 8, 'sept': 8,
             'october': 9, 'oct': 9,
             'november': 10, 'nov': 10,
-            'december': 11, 'dec': 11,
-
-            // Français (complet et abrégé)
-            'janvier': 0, 'jan': 0,
-            'février': 1, 'fevrier': 1, 'fév': 1, 'fev': 1,
-            'mars': 2, 'mar': 2,
-            'avril': 3, 'avr': 3,
-            'mai': 4,
-            'juin': 5, 'jun': 5,
-            'juillet': 6, 'juil': 6, 'jul': 6,
-            'août': 7, 'aout': 7, 'aou': 7,
-            'septembre': 8, 'sep': 8, 'sept': 8,
-            'octobre': 9, 'oct': 9,
-            'novembre': 10, 'nov': 10,
-            'décembre': 11, 'decembre': 11, 'déc': 11, 'dec': 11
+            'december': 11, 'dec': 11
         };
 
-        // Normaliser la chaîne (enlever les accents, passer en minuscules)
-        const normalized = monthStr.toLowerCase()
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Enlever les accents
-            .replace(/\./g, ''); // Enlever les points
-
         // Recherche directe
-        if (monthMap[normalized] !== undefined) {
-            return monthMap[normalized];
+        if (monthMappings[normalized] !== undefined) {
+            return monthMappings[normalized];
         }
 
-        // Recherche partielle (pour les abréviations et variations)
-        for (const [key, value] of Object.entries(monthMap)) {
-            if (normalized.includes(key) || key.includes(normalized)) {
+        // Recherche par correspondance partielle
+        for (const [key, value] of Object.entries(monthMappings)) {
+            // Vérifier si la chaîne normalisée est au début de la clé ou vice versa
+            if (key.startsWith(normalized) || normalized.startsWith(key)) {
                 return value;
             }
         }
 
-        // Essayer de reconnaître le mois par ses premières lettres
+        // Recherche par les 3 premières lettres
         if (normalized.length >= 3) {
-            const firstThreeChars = normalized.substring(0, 3);
-            for (const [key, value] of Object.entries(monthMap)) {
-                if (key.startsWith(firstThreeChars)) {
+            const firstThree = normalized.substring(0, 3);
+            for (const [key, value] of Object.entries(monthMappings)) {
+                if (key.startsWith(firstThree)) {
                     return value;
                 }
             }
         }
 
-        // Si aucune correspondance n'a été trouvée
-        console.log(`Mois non reconnu: ${monthStr} (normalisé: ${normalized})`);
+        // Cas spéciaux
+        if (normalized === 'm' || normalized === 'ma') {
+            // Ambigu entre mars et mai - supposer mai
+            return 4;
+        }
+
+        console.log(`Mois non reconnu: "${monthStr}" (normalisé: "${normalized}")`);
         return -1;
     }
 
-    
+
     // Function to render the calendar
     function renderCalendar() {
         const calendarContainer = document.getElementById('calendar-container');
