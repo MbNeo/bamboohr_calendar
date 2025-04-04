@@ -2,7 +2,7 @@
 
 Ce script Tampermonkey ajoute un calendrier annuel intuitif à l'interface BambooHR, permettant de visualiser facilement tous vos congés avec un code couleur cohérent.
 
-![Aperçu du calendrier](screenshots/calendar-preview.png)
+![Aperçu du calendrier](screenshots/Screenshot001.png)
 
 ## Fonctionnalités
 
