@@ -417,7 +417,8 @@
         if (/anciennet|ab-631/.test(lowered)) return 'seniority';
         if (/holiday|férié|ferie|jour férié|easter|ascension|may day|labour day|victoire|ostern|auffahrt|mai feiertag/i.test(lowered)) return 'holiday';
         if (/ab-300|paid leave|congés|conge|urlaub/i.test(lowered)) return 'leave';
-
+        if (/ab-632|unpaid leave|congé sans solde|unbezahlter urlaub/i.test(lowered)) return 'unpaid';
+        if (/ab-100|sick|maladie|krank/i.test(lowered)) return 'sick';
 
         return 'other';
     }
@@ -428,11 +429,12 @@
             'leave': '#2196F3',
             'holiday': '#9C27B0',
             'seniority': '#FF9800',
+            'unpaid': '#E91E63',
+            'sick': '#795548',
             'other': '#607D8B'
         };
         return colors[type] || '#607D8B';
     }
-
 
     /**
      * Construit la légende des types de congés et l'insère dans le DOM.
@@ -458,6 +460,10 @@
             'holiday': isFrench ? 'Jours fériés' : 'Public Holidays',
             'seniority': isFrench ? 'Ancienneté' : 'Seniority',
             'AB-631': isFrench ? 'Ancienneté' : 'Seniority',
+            'unpaid': isFrench ? 'Congé sans solde' : 'Unpaid Leave',
+            'AB-632': isFrench ? 'Congé sans solde' : 'Unpaid Leave',
+            'sick': isFrench ? 'Maladie' : 'Sick Leave',
+            'AB-100': isFrench ? 'Maladie' : 'Sick Leave',
             'other': isFrench ? 'Autres' : 'Other'
         };
 
