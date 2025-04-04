@@ -21,7 +21,7 @@ Ce script Tampermonkey ajoute un calendrier annuel intuitif à l'interface Bambo
    - [Edge](https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd)
 
 ### Installation automatique
-1. Cliquez sur ce lien pour installer automatiquement le script : [Installer le script](https://github.com/votre-utilisateur/bamboohr-calendar-enhancement/raw/main/bamboohr-calendar-view.user.js)
+1. Click this link to automatically install the script: [Install Script](https://github.com/MbNeo/bamboohr_calendar/raw/main/bamboohr-calendar-view.user.js)
 
 ### Installation manuelle
 1. Cliquez sur l'icône Tampermonkey dans votre navigateur
