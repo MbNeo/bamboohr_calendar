@@ -613,6 +613,7 @@
     }
 
     // Fonction très robuste d'analyse des dates dans différentes langues et formats
+    // Fonction très robuste d'analyse des dates dans différentes langues et formats
     function parseDateUniversal(dateText) {
         try {
             console.log(`Analyse de la date: "${dateText}"`);
@@ -665,9 +666,14 @@
                 const currentYear = new Date().getFullYear();
 
                 if (startDay !== null && startMonth !== -1 && endDay !== null && endMonth !== -1) {
+                    const startDate = new Date(currentYear, startMonth, startDay);
+                    const endDate = new Date(currentYear, endMonth, endDay);
+
+                    console.log(`Dates créées: du ${startDate.toLocaleDateString()} au ${endDate.toLocaleDateString()}`);
+
                     return {
-                        startDate: new Date(currentYear, startMonth, startDay),
-                        endDate: new Date(currentYear, endMonth, endDay)
+                        startDate: startDate,
+                        endDate: endDate
                     };
                 }
             } else {
@@ -685,18 +691,69 @@
                     if (month !== -1) {
                         const currentYear = new Date().getFullYear();
                         const date = new Date(currentYear, month, day);
-                        return { startDate: date, endDate: date };
+
+                        console.log(`Date créée: ${date.toLocaleDateString()}`);
+
+                        return {
+                            startDate: date,
+                            endDate: date
+                        };
                     }
                 }
             }
 
-            // Échec de l'analyse, retourner des valeurs nulles
-            console.log(`Échec de l'analyse pour: "${dateText}"`);
-            return { startDate: null, endDate: null };
+            // Échec de l'analyse, essayer une approche alternative
+            console.log(`Tentative d'analyse alternative pour: "${dateText}"`);
+
+            // Pour les cas comme "7 juil. - 25" où le jour de fin n'a pas de mois explicite
+            if (isRange) {
+                const parts = normalizedText.split('-').map(p => p.trim());
+
+                // Si la partie de fin est juste un nombre
+                if (/^\d+$/.test(parts[1])) {
+                    // Extraire le jour et le mois du début
+                    const startMatch = parts[0].match(/(\d+)\s+([a-zéèêùûôâ.]+)/i);
+                    if (startMatch) {
+                        const startDay = parseInt(startMatch[1]);
+                        const startMonthStr = startMatch[2].trim().toLowerCase();
+                        const startMonth = getMonthNumberRobust(startMonthStr);
+
+                        // Extraire le jour de fin
+                        const endDay = parseInt(parts[1]);
+
+                        if (startMonth !== -1 && !isNaN(endDay)) {
+                            const currentYear = new Date().getFullYear();
+                            const startDate = new Date(currentYear, startMonth, startDay);
+                            const endDate = new Date(currentYear, startMonth, endDay);
+
+                            console.log(`Dates créées (analyse alternative): du ${startDate.toLocaleDateString()} au ${endDate.toLocaleDateString()}`);
+
+                            return {
+                                startDate: startDate,
+                                endDate: endDate
+                            };
+                        }
+                    }
+                }
+            }
+
+            // Échec de l'analyse, retourner des valeurs par défaut
+            console.log(`Échec de l'analyse pour: "${dateText}", utilisation de dates par défaut`);
+            // En cas d'échec, utiliser la date actuelle comme valeur par défaut
+            const today = new Date();
+            return {
+                startDate: today,
+                endDate: today
+            };
 
         } catch (error) {
             console.error('Erreur d\'analyse de date:', error);
-            return { startDate: null, endDate: null };
+            // En cas d'erreur, utiliser la date actuelle comme valeur par défaut
+            const today = new Date();
+            return {
+                startDate: today,
+                endDate: today
+            };
         }
     }
 
