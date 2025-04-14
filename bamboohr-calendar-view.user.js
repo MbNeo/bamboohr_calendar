@@ -359,6 +359,7 @@
     /**
      * Initializes the calendar by inserting the container and populating data
      */
+
     function initializeCalendar() {
         // Determine page language
         currentLanguage = detectLanguage();
@@ -368,37 +369,61 @@
         container.className = 'custom-calendar-container';
         container.id = 'calendar-container';
         container.innerHTML = `
-            <div class="calendar-header">
-                <h2>${getText('title')}</h2>
-                <div class="view-buttons">
-                    <button id="toggle-view">${getText('viewMonth')}</button>
-                </div>
+        <div class="calendar-header">
+            <h2>${getText('title')}</h2>
+            <div class="view-buttons">
+                <button id="toggle-view">${getText('viewMonth')}</button>
             </div>
-            <!-- Leave types legend -->
-            <div class="leave-type-legend" id="legend-container"></div>
-            <!-- Calendar display area (month or year) -->
-            <div id="calendar-display"></div>
-        `;
-        // Insert calendar after the main PTO container
-        const main = document.querySelector('main#micro-container5');
-        if (main) {
-            const innerContainer = main.querySelector('div');
-            if (innerContainer) {
-                const innerDivs = Array.from(innerContainer.children).filter(el => el.tagName === 'DIV');
-                if (innerDivs.length >= 3) {
-                    // Insert just before the 3rd div (index 2)
-                    innerContainer.insertBefore(container, innerDivs[2]);
-                    console.log("✅ Calendar inserted between 2nd and 3rd div");
+        </div>
+        <!-- Leave types legend -->
+        <div class="leave-type-legend" id="legend-container"></div>
+        <!-- Calendar display area (month or year) -->
+        <div id="calendar-display"></div>
+    `;
+
+        // Find the appropriate container for insertion
+        // Instead of looking for a specific ID, search for a main element
+        // that contains a section with the "Upcoming Time Off" text
+        const upcomingTimeOffSpan = Array.from(document.querySelectorAll('span')).find(el =>
+                                                                                       UPCOMING_TIME_OFF_REGEX.test(el.textContent.trim())
+                                                                                      );
+
+        if (upcomingTimeOffSpan) {
+            // Find the nearest main element
+            let mainElement = upcomingTimeOffSpan.closest('main');
+
+            if (!mainElement) {
+                // If no main element directly contains the span, look for any main element
+                const mains = document.querySelectorAll('main');
+                if (mains.length > 0) {
+                    // Use the first main found as fallback
+                    mainElement = mains[0];
+                    console.log("⚠️ Using first main element as fallback");
+                }
+            }
+
+            if (mainElement) {
+                // Find the appropriate place to insert: after the "Upcoming Time Off" section
+                const upcomingSection = upcomingTimeOffSpan.closest('section, div, article');
+
+                if (upcomingSection) {
+                    // Insert after the upcoming time off section
+                    upcomingSection.parentNode.insertBefore(container, upcomingSection.nextSibling);
+                    console.log("✅ Calendar inserted after Upcoming Time Off section");
                 } else {
-                    // Fallback if we can't find 3 divs
-                    innerContainer.appendChild(container);
-                    console.warn("⚠️ Less than 3 divs in inner container, appending at the end");
+                    // Fallback: append to the main element
+                    mainElement.appendChild(container);
+                    console.warn("⚠️ Could not find Upcoming Time Off section, appending to main");
                 }
             } else {
-                console.warn("❌ No inner <div> found in #micro-container5");
+                console.warn("❌ No main element found in the document");
+                // Fallback: just append to body
+                document.body.appendChild(container);
             }
         } else {
-            console.warn("❌ Unable to find <main id='micro-container5'>");
+            console.warn("❌ No 'Upcoming Time Off' text found");
+            // Fallback: append to body
+            document.body.appendChild(container);
         }
 
         // Load time off data
