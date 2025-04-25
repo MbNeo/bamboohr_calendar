@@ -53,6 +53,7 @@
             legendOther: "Other",
             legendUnpaid: "Unpaid Leave",
             legendSick: "Sick Leave",
+            legendpaternity: "Paternity",
             errorNoData: "No time off data available to display.",
             approved: "Approved",
             pending: "Pending"
@@ -69,6 +70,7 @@
             legendOther: "Autres",
             legendUnpaid: "Congé sans solde",
             legendSick: "Maladie",
+            legendpaternity: "Paternité",
             errorNoData: "Aucune donnée de congé à afficher.",
             approved: "Approuvé",
             pending: "En attente"
@@ -85,6 +87,7 @@
             legendOther: "Andere",
             legendUnpaid: "Unbezahlter Urlaub",
             legendSick: "Krankheit",
+            legendpaternity: "Vaterschaft",
             errorNoData: "Keine Urlaubsdaten zum Anzeigen verfügbar.",
             approved: "Genehmigt",
             pending: "Ausstehend"
@@ -93,6 +96,8 @@
 
     // Prevent multiple script executions on the same page
     let calendarInitialized = false;
+
+    let events = [];
 
     // Custom CSS styles for the calendar and its elements
     const customCSS = document.createElement('style');
@@ -276,6 +281,14 @@
   background-color: #ff9800 !important;
   color: white !important;
 }
+.mini-cell.event-paternity {
+  background-color: #fd6c9e !important;
+  color: white !important;
+}
+.mini-cell.event-sick {
+  background-color: #795548 !important;
+  color: white !important;
+}
 .mini-cell.event-other {
   background-color: #607d8b !important;
   color: white !important;
@@ -429,21 +442,6 @@
             document.body.appendChild(container);
         }
 
-        // Load time off data
-        const events = extractTimeOffData();
-        if (DEBUG) console.log("Extracted time off data:", events);
-        // Display an error message if no data could be extracted
-        if (!events || events.length === 0) {
-            const errorMsg = document.createElement('p');
-            errorMsg.style.color = 'red';
-            errorMsg.textContent = getText('errorNoData');
-            container.querySelector('#calendar-display').appendChild(errorMsg);
-            return;
-        }
-
-        // Build leave type legend dynamically
-        buildLegend(events);
-
         // Initialize view (default to year view)
         currentView = 'year';
         const toggleViewBtn = container.querySelector('#toggle-view');
@@ -467,8 +465,8 @@
      * Extracts time off data visible on the page.
      * Returns an array of objects { title, start, end, color, type, status }.
      */
-    function extractTimeOffData() {
-        const events = [];
+    async function extractTimeOffData(year = currentYear) {
+        events = [];
 
         const span = Array.from(document.querySelectorAll('span')).find(el =>
             UPCOMING_TIME_OFF_REGEX.test(el.textContent.trim())
@@ -485,13 +483,13 @@
             return [];
         }
 
-        const paragraphs = Array.from(container.querySelectorAll('p'));        
+        const paragraphs = Array.from(container.querySelectorAll('p'));
         for (let i = 0; i < paragraphs.length; i++) {
             const line = paragraphs[i].textContent.trim();
             console.log("line", line);
 
             const dateInfo = parseDateUniversal(line);
-            
+
             if (dateInfo.startDate && !isNaN(dateInfo.startDate.getTime())) {
                 const dateText = line;
                 let description = '';
@@ -524,10 +522,59 @@
             }
         }
 
-        console.log("events", events);
+    const types = [91, 94, 95, 81, 84, 98, 97, 107, 86, 111];
 
-        return events;
-    }
+    const ajaxPromises = types.map(t => {
+        return new Promise((resolve, reject) => {
+            const url_source =  window.location.origin;
+            let params = new URLSearchParams(window.location.search);
+            let id = params.get('id');
+
+            $.get(window.location.origin + `/time_off/table/requests?id=${id}&type=${t}&year=${year}`)
+                .done(data => {
+                let typeName = 'Previous Time Off';
+                let typeCategory = 'other';
+                let color = 'other';
+
+                if (data.type)
+                {
+                    typeName = data.type.name;
+                    typeCategory = detectTypeFromText(typeName);
+                    color = getColorForType(typeCategory);
+                }
+
+
+                $.each(data.requests, function (key, value) {
+                    events.push({
+                        title: typeName,
+                        start: new Date(value.startYmd +" 00:00:00"),
+                        end: new Date(value.endYmd +" 00:00:00"),
+                        type: typeCategory,
+                        color: color,
+                        status: value.status
+                    });
+                });
+                    resolve(events);
+                })
+                .fail(err => {
+                    console.warn(`❌ Erreur AJAX pour le type ${t}:`, err);
+                    resolve([]); // on continue même si un type échoue
+                });
+        });
+    });
+
+    // Attendre tous les appels AJAX
+    const results = await Promise.all(ajaxPromises);
+
+    // Fusionner tous les events AJAX dans le tableau principal
+    results.forEach(eventArray => {
+        events.push(...eventArray);
+    });
+
+   events = [...new Set(events)];
+
+   return events
+   }
 
     /**
      * Detects the type of leave from the description text
@@ -543,6 +590,7 @@
         if (/ab-300|paid leave|congés|conge|urlaub/i.test(lowered)) return 'leave';
         if (/ab-632|unpaid leave|congé sans solde|unbezahlter urlaub/i.test(lowered)) return 'unpaid';
         if (/ab-100|sick|maladie|krank/i.test(lowered)) return 'sick';
+        if (/ab-210|paternity|paternité|vaterschaft/i.test(lowered)) return 'paternity';
 
         return 'other';
     }
@@ -560,6 +608,7 @@
             'seniority': '#FF9800',
             'unpaid': '#E91E63',
             'sick': '#795548',
+            'paternity': '#fd6c9e',
             'other': '#607D8B'
         };
         return colors[type] || '#607D8B';
@@ -573,6 +622,7 @@
         const legendContainer = document.getElementById('legend-container');
         if (!legendContainer) return;
 
+        legendContainer.innerHTML = "";
         // Gather unique categories present in events
         const categories = new Set();
         events.forEach(ev => {
@@ -592,6 +642,8 @@
             'AB-632': getText('legendUnpaid'),
             'sick': getText('legendSick'),
             'AB-100': getText('legendSick'),
+            'paternity': getText('legendpaternity'),
+            'AB-210': getText('legendpaternity'),
             'other': getText('legendOther')
         };
 
@@ -617,7 +669,24 @@
     /**
      * Displays the calendar according to current view (year or month)
      */
-    function renderCalendar() {
+    async function renderCalendar() {
+
+                // Load time off data
+        const events = await extractTimeOffData();
+        if (DEBUG) console.log("Extracted time off data:", events);
+        // Display an error message if no data could be extracted
+        if (!events || events.length === 0) {
+            const errorMsg = document.createElement('p');
+            errorMsg.style.color = 'red';
+            errorMsg.textContent = getText('errorNoData');
+            container.querySelector('#calendar-display').appendChild(errorMsg);
+            return;
+        }
+
+        // Build leave type legend dynamically
+        buildLegend(events);
+
+
         const calendarContainer = document.getElementById('calendar-display');
         if (!calendarContainer) return;
         // Clear current content
@@ -670,7 +739,7 @@
             // Current month days
             for (let day = 1; day <= lastDay.getDate(); day++) {
                 const date = new Date(currentYear, month, day);
-                const events = getEventsForDate(date);
+                const events = getEventsForDate(date, currentYear);
                 const dayOfWeek = date.getDay();
                 const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
                 const isToday = isCurrentYear && today.getMonth() === month && today.getDate() === day;
@@ -723,7 +792,7 @@
     function renderMonthView(container) {
         const monthNames = getMonthNames();
         const dayNames = getDayNames();
-        
+
         const today = new Date();
         const isCurrentMonth = (today.getFullYear() === currentYear && today.getMonth() === currentMonth);
 
@@ -756,7 +825,7 @@
         // Days of current month
         for (let day = 1; day <= lastDay.getDate(); day++) {
             const date = new Date(currentYear, currentMonth, day);
-            const events = getEventsForDate(date);
+            const events = getEventsForDate(date, currentYear);
             const dayOfWeek = date.getDay();
             const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
             const isToday = isCurrentMonth && today.getDate() === day;
@@ -819,10 +888,13 @@
      * @param {Date} date - The date to check
      * @returns {Array} Array of events matching the date
      */
-    function getEventsForDate(date) {
+    function getEventsForDate(date, year) {
         // Use the year extracted in extractTimeOffData (via closure)
         // Filter extracted events where the date covers the given day
-        return (typeof extractTimeOffData.cached !== 'undefined' ? extractTimeOffData.cached : (extractTimeOffData.cached = extractTimeOffData()))
+        //return (typeof extractTimeOffData.cached !== 'undefined' ? extractTimeOffData.cached : (extractTimeOffData.cached = extractTimeOffData()))
+        //    .filter(event => date >= event.start && date <= event.end);
+
+        return (typeof events !== 'undefined' ? events : (events = extractTimeOffData(year)))
             .filter(event => date >= event.start && date <= event.end);
     }
 
