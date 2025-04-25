@@ -5,7 +5,7 @@
 // @description  Adds an annual leave calendar to BambooHR with color-coded events
 // @author       Mathias Bauer (mbneofrance@gmail.com)
 // @copyright    2025, Mathias Bauer
-// @license      MIT
+// @license     MIT; https://opensource.org/licenses/MIT
 // @match        https://*.bamboohr.com/employees/pto*
 // @updateURL    https://openuserjs.org/meta/MbNeo/BambooHR_Calendar_View.meta.js
 // @downloadURL  https://openuserjs.org/src/scripts/MbNeo/BambooHR_Calendar_View.user.js
