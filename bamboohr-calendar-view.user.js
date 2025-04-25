@@ -1,13 +1,16 @@
 // ==UserScript==
 // @name         BambooHR Calendar View
 // @namespace    https://github.com/MbNeo/bamboohr_calendar
-// @version      0.3
+// @version      0.5
 // @description  Adds an annual leave calendar to BambooHR with color-coded events
 // @author       Mathias Bauer (mbneofrance@gmail.com)
+// @copyright    2025, Mathias Bauer
+// @license      MIT
 // @match        https://*.bamboohr.com/employees/pto*
+// @updateURL    https://openuserjs.org/meta/MbNeo/BambooHR_Calendar_View.meta.js
+// @downloadURL  https://openuserjs.org/src/scripts/MbNeo/BambooHR_Calendar_View.user.js
+// @icon         https://www.bamboohr.com/favicon.ico
 // @grant        none
-// @updateURL    https://github.com/MbNeo/bamboohr_calendar/raw/main/bamboohr-calendar-view.user.js
-// @downloadURL  https://github.com/MbNeo/bamboohr_calendar/raw/main/bamboohr-calendar-view.user.js
 // ==/UserScript==
 
 (function () {
