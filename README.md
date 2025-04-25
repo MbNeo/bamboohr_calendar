@@ -51,5 +51,10 @@ This script has been tested with:
 ## Contribution
 Contributions are welcome! Feel free to open an issue or a pull request.
 
+## Contributors
+
+- **Mathias Bauer**
+- **Thibault Guillaume** (historical leaves)
+
 ## License
 [MIT License](LICENSE)

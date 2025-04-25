@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BambooHR Calendar View
 // @namespace    https://github.com/MbNeo/bamboohr_calendar
-// @version      0.5
+// @version      0.6
 // @description  Adds an annual leave calendar to BambooHR with color-coded events
 // @author       Mathias Bauer (mbneofrance@gmail.com)
 // @copyright    2025, Mathias Bauer
