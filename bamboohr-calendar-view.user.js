@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BambooHR Calendar View
 // @namespace    https://github.com/MbNeo/bamboohr_calendar
-// @version      0.6
+// @version      0.7
 // @description  Adds an annual leave calendar to BambooHR with color-coded events
 // @author       Mathias Bauer (mbneofrance@gmail.com)
 // @copyright    2025, Mathias Bauer
@@ -462,12 +462,44 @@
     }
 
     /**
-     * Extracts time off data visible on the page.
-     * Returns an array of objects { title, start, end, color, type, status }.
-     */
-    async function extractTimeOffData(year = currentYear) {
-        events = [];
+ * Extrait les types (categoryId) depuis un appel AJAX avant de charger les événements
+ * @param {number} year - L'année pour laquelle extraire les données
+ * @returns {Promise<Array>} - Liste des événements
+ */
+async function extractTimeOffData(year = currentYear) {
+    events = [];
 
+    // Extraire les types disponibles d'abord
+    try {
+        // Récupérer l'ID de l'employé depuis l'URL
+        let params = new URLSearchParams(window.location.search);
+        let employeeId = params.get('id');
+
+        if (!employeeId) {
+            console.warn('❌ Pas d\'ID d\'employé trouvé dans l\'URL');
+            return [];
+        }
+
+        // Effectuer l'appel AJAX pour récupérer les politiques
+        const policiesResponse = await $.ajax({
+            url: window.location.origin + `/time_off/employee?employeeId=${employeeId}`,
+            method: 'GET',
+            dataType: 'json'
+        });
+
+        if (!policiesResponse || !policiesResponse.policies) {
+            console.warn('❌ Pas de politiques trouvées dans la réponse AJAX');
+            return [];
+        }
+
+        // Extraire les categoryId des politiques
+        const types = policiesResponse.policies.map(policy => policy.categoryId);
+
+        if (DEBUG) {
+            console.log('✅ Types chargés dynamiquement:', types);
+        }
+
+        // Extraire les événements à partir de l'interface utilisateur
         const span = Array.from(document.querySelectorAll('span')).find(el =>
             UPCOMING_TIME_OFF_REGEX.test(el.textContent.trim())
         );
@@ -522,58 +554,57 @@
             }
         }
 
-    const types = [91, 94, 95, 81, 84, 98, 97, 107, 86, 111];
+        // Maintenant, chargez les événements pour chaque type
+        const ajaxPromises = types.map(t => {
+            return new Promise((resolve, reject) => {
+                const url_source = window.location.origin;
+                let params = new URLSearchParams(window.location.search);
+                let id = params.get('id');
 
-    const ajaxPromises = types.map(t => {
-        return new Promise((resolve, reject) => {
-            const url_source =  window.location.origin;
-            let params = new URLSearchParams(window.location.search);
-            let id = params.get('id');
+                $.get(window.location.origin + `/time_off/table/requests?id=${id}&type=${t}&year=${year}`)
+                    .done(data => {
+                        let typeName = 'Previous Time Off';
+                        let typeCategory = 'other';
+                        let color = 'other';
 
-            $.get(window.location.origin + `/time_off/table/requests?id=${id}&type=${t}&year=${year}`)
-                .done(data => {
-                let typeName = 'Previous Time Off';
-                let typeCategory = 'other';
-                let color = 'other';
+                        if (data.type) {
+                            typeName = data.type.name;
+                            typeCategory = detectTypeFromText(typeName);
+                            color = getColorForType(typeCategory);
+                        }
 
-                if (data.type)
-                {
-                    typeName = data.type.name;
-                    typeCategory = detectTypeFromText(typeName);
-                    color = getColorForType(typeCategory);
-                }
-
-
-                $.each(data.requests, function (key, value) {
-                    events.push({
-                        title: typeName,
-                        start: new Date(value.startYmd +" 00:00:00"),
-                        end: new Date(value.endYmd +" 00:00:00"),
-                        type: typeCategory,
-                        color: color,
-                        status: value.status
+                        $.each(data.requests, function (key, value) {
+                            events.push({
+                                title: typeName,
+                                start: new Date(value.startYmd + " 00:00:00"),
+                                end: new Date(value.endYmd + " 00:00:00"),
+                                type: typeCategory,
+                                color: color,
+                                status: value.status
+                            });
+                        });
+                        resolve(events);
+                    })
+                    .fail(err => {
+                        console.warn(`❌ Erreur AJAX pour le type ${t}:`, err);
+                        resolve([]); // on continue même si un type échoue
                     });
-                });
-                    resolve(events);
-                })
-                .fail(err => {
-                    console.warn(`❌ Erreur AJAX pour le type ${t}:`, err);
-                    resolve([]); // on continue même si un type échoue
-                });
+            });
         });
-    });
 
-    // Attendre tous les appels AJAX
-    const results = await Promise.all(ajaxPromises);
+        // Attendre tous les appels AJAX
+        const results = await Promise.all(ajaxPromises);
 
-    // Fusionner tous les events AJAX dans le tableau principal
-    results.forEach(eventArray => {
-        events.push(...eventArray);
-    });
+        // Supprimer les doublons
+        events = [...new Set(events)];
 
-   events = [...new Set(events)];
+        return events;
 
-   return events
+    } catch (error) {
+        console.error('❌ Erreur lors du chargement des types:', error);
+
+        return [];
+    }
    }
 
     /**
